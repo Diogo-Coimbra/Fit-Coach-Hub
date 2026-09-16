@@ -56,6 +56,7 @@ app.post('/api/auth/google', async (req, res) => {
         email: payload.email!,
         name: payload.name!,
         picture: payload.picture,
+        role: 'CLIENT',
       },
     });
 
@@ -136,7 +137,7 @@ app.post('/api/workouts/:workoutId/clone', async (req, res) => {
     // 2. Criar a cópia exata usando o "Nested Create" do Prisma
     const clonedWorkout = await prisma.workout.create({
       data: {
-        name: `${originalWorkout.name} (Cópia)`, // Adicionamos a etiqueta para se distinguir
+        name: `${originalWorkout.name} (Copy)`,
         description: originalWorkout.description,
         userId: originalWorkout.userId, // Mantemos o mesmo dono
         
@@ -394,15 +395,16 @@ app.post('/api/ai/generate-workout', async (req, res) => {
 
     // O Segredo: O Prompt do Sistema para forçar a IA a cuspir um JSON certinho
     const systemInstruction = `
-      És um personal trainer de elite. O utilizador vai pedir-te um treino.
-      Tens de responder ESTRITAMENTE num formato JSON válido, sem texto extra ou formatação markdown (sem \`\`\`json).
-      Usa exatamente esta estrutura:
+      You are an elite personal trainer. The user will request a workout.
+      Reply STRICTLY with valid JSON, no extra text and no markdown fences.
+      All names and descriptions must be in English.
+      Use exactly this structure:
       {
-        "name": "Nome do Treino (ex: Treino de Força - Peito)",
-        "description": "Uma breve frase motivacional ou objetivo do treino",
+        "name": "Workout name (e.g. Strength - Chest)",
+        "description": "A short objective for the session",
         "exercises": [
           {
-            "name": "Nome do Exercício",
+            "name": "Exercise name",
             "sets": 4,
             "reps": 10,
             "weight": 0
@@ -411,7 +413,7 @@ app.post('/api/ai/generate-workout', async (req, res) => {
       }
     `;
 
-    const fullPrompt = `${systemInstruction}\n\nPedido do utilizador: ${prompt}`;
+    const fullPrompt = `${systemInstruction}\n\nUser request: ${prompt}`;
 
     // Pedir à IA para pensar e responder
     const result = await model.generateContent(fullPrompt);
@@ -658,16 +660,17 @@ app.post('/api/nutrition/analyze', async (req, res) => {
     // 👇 AQUI ESTÁ ELE: Fixo, direto e super rápido!
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-    const prompt = `És um nutricionista especialista. Analisa esta imagem de comida.
-    Estima as porções visíveis e devolve APENAS um objeto JSON válido.
-    Não escrevas mais nada, não uses formatação markdown (sem \`\`\`json).
-    A estrutura tem de ser EXATAMENTE esta:
+    const prompt = `You are a nutrition expert. Analyze this food photo.
+    Estimate visible portions and return ONLY a valid JSON object.
+    No extra text and no markdown fences.
+    Use English for the meal name.
+    Use exactly this structure:
     {
-      "name": "Nome descritivo do prato (ex: Bife de Frango com Arroz)",
-      "calories": numero_inteiro_estimado,
-      "protein": numero_inteiro_estimado_em_gramas,
-      "carbs": numero_inteiro_estimado_em_gramas,
-      "fat": numero_inteiro_estimado_em_gramas
+      "name": "Descriptive meal name (e.g. Chicken steak with rice)",
+      "calories": estimated_integer,
+      "protein": estimated_protein_grams,
+      "carbs": estimated_carbs_grams,
+      "fat": estimated_fat_grams
     }`;
 
     const imageParts = [

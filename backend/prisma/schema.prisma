@@ -9,6 +9,11 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  COACH
+  CLIENT
+}
+
 model User {
   id            String       @id @default(uuid())
   googleId      String?      @unique
@@ -16,20 +21,37 @@ model User {
   email         String       @unique
   password      String?
   picture       String?
+  role          Role         @default(CLIENT)
   weeklyGoal    Int          @default(3)
   currentStreak Int          @default(0)
-  
+
   dailyCalories Int          @default(2500)
   dailyProtein  Int          @default(150)
   dailyCarbs    Int          @default(300)
   dailyFat      Int          @default(80)
 
   createdAt     DateTime     @default(now())
-  
+
   workouts      Workout[]
   logs          WorkoutLog[]
   bodyMetrics   BodyMetric[]
-  meals         MealLog[] 
+  meals         MealLog[]
+  clients       CoachClient[] @relation("CoachClients")
+  coaches       CoachClient[] @relation("ClientCoaches")
+}
+
+model CoachClient {
+  id        String   @id @default(uuid())
+  coachId   String
+  clientId  String
+  createdAt DateTime @default(now())
+
+  coach  User @relation("CoachClients", fields: [coachId], references: [id], onDelete: Cascade)
+  client User @relation("ClientCoaches", fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([coachId, clientId])
+  @@index([coachId])
+  @@index([clientId])
 }
 
 // NOVO MODELO: O Treino (ex: "Dia de Peito", "Leg Day")

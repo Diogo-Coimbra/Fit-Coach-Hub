@@ -1,11 +1,14 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+export type UserRole = 'COACH' | 'CLIENT';
+
 interface User {
   id?: string;
   name: string;
   email: string;
   picture?: string;
+  role?: UserRole;
   weeklyGoal?: number;
   currentStreak?: number;
   dailyCalories?: number;
@@ -36,7 +39,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       // E só depois avisamos a app para mudar o ecrã
       set({ user: userData });
     } catch (error) {
-      console.error("Erro ao guardar sessão:", error);
+      console.error('Failed to save session:', error);
     }
   },
 
@@ -46,7 +49,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       await AsyncStorage.removeItem('user_session');
       set({ user: null });
     } catch (error) {
-      console.error("Erro ao apagar sessão:", error);
+      console.error('Failed to clear session:', error);
     }
   },
 
@@ -60,7 +63,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ isLoading: false });
       }
     } catch (error) {
-      console.error("Erro ao ler sessão:", error);
+      console.error('Failed to read session:', error);
       set({ isLoading: false });
     }
   },
@@ -73,7 +76,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       // 2. Atualizamos o estado da app em tempo real (ex: muda o nome logo no Dashboard)
       set({ user: updatedUser });
     } catch (error) {
-      console.error("Erro ao atualizar os dados da sessão local:", error);
+      console.error('Failed to update local session:', error);
     }
   }
 }));

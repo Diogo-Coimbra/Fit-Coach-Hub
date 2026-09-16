@@ -1,25 +1,31 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { StyleSheet, Text, View, ActivityIndicator, TouchableOpacity, FlatList, Alert, Platform } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  FlatList,
+  Alert,
+  Platform,
+  ActivityIndicator,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/useAuthStore';
+import { BackButton, Button, Card, Screen, showAlert, Title } from '../components/ui';
+import { colors, radius, space } from '../theme';
 
 export default function WorkoutDetailsScreen({ route, navigation }: any) {
   const { workoutId } = route.params;
   const { user } = useAuthStore();
-  
+
   const [workoutDetails, setWorkoutDetails] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [completedExercises, setCompletedExercises] = useState<string[]>([]);
   const [isFinishing, setIsFinishing] = useState(false);
   const [isCloning, setIsCloning] = useState(false);
   const [startTime] = useState<Date>(new Date());
-
-  // ==========================================
-  // US 36: ESTADO PARA GUARDAR OS RECORDES PESSOAIS
-  // ==========================================
   const [exercisePRs, setExercisePRs] = useState<Record<string, number>>({});
-
-  // Estados do Temporizador de Descanso
   const [timeLeft, setTimeLeft] = useState(0);
   const [timerState, setTimerState] = useState<'idle' | 'running' | 'finished'>('idle');
 
@@ -49,31 +55,27 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  // ==========================================
-  // US 36: FUNÇÃO PARA BUSCAR OS PRs DE TODOS OS EXERCÍCIOS
-  // ==========================================
   const fetchPRs = async (exercises: any[]) => {
     if (!user?.id || !exercises || exercises.length === 0) return;
 
     const prData: Record<string, number> = {};
-    
-    // Fazemos os pedidos todos em paralelo para ser instantâneo
+
     await Promise.all(
       exercises.map(async (ex) => {
         try {
-          const response = await fetch(`http://192.168.1.80:3000/api/exercises/${user.id}/pr/${encodeURIComponent(ex.name)}`);
+          const response = await fetch(
+            `http://192.168.1.80:3000/api/exercises/${user.id}/pr/${encodeURIComponent(ex.name)}`
+          );
           if (response.ok) {
             const data = await response.json();
-            if (data.pr > 0) {
-              prData[ex.name] = data.pr; // Guarda o PR usando o nome do exercício como chave
-            }
+            if (data.pr > 0) prData[ex.name] = data.pr;
           }
         } catch (error) {
-          console.error(`❌ Erro ao buscar PR para ${ex.name}:`, error);
+          console.error(`Failed to load PR for ${ex.name}:`, error);
         }
       })
     );
-    
+
     setExercisePRs(prData);
   };
 
@@ -83,13 +85,9 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
       const response = await fetch(`http://192.168.1.80:3000/api/workouts/detail/${workoutId}`);
       const data = await response.json();
       setWorkoutDetails(data);
-      
-      // Assim que os exercícios chegam, vamos ver se há recordes para eles!
-      if (data?.exercises) {
-        await fetchPRs(data.exercises);
-      }
+      if (data?.exercises) await fetchPRs(data.exercises);
     } catch (error) {
-      console.error('❌ Erro ao ir buscar os detalhes:', error);
+      console.error('Failed to load workout:', error);
     } finally {
       setIsLoading(false);
     }
@@ -110,69 +108,54 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
           exercises: prev.exercises.filter((ex: any) => ex.id !== exerciseId),
         }));
       } else {
-        alert('Erro: Não foi possível apagar o exercício.');
+        showAlert('Error', 'Could not delete this exercise.');
       }
     } catch (error) {
-      console.error('❌ Erro ao apagar exercício:', error);
+      console.error('Failed to delete exercise:', error);
     }
   };
 
   const executeDeleteWorkout = async () => {
     try {
       const response = await fetch(`http://192.168.1.80:3000/api/workouts/${workoutId}`, { method: 'DELETE' });
-      if (response.ok) {
-        navigation.navigate('Dashboard');
-      } else {
-        alert('Erro: Não foi possível apagar o treino.');
-      }
+      if (response.ok) navigation.navigate('Dashboard');
+      else showAlert('Error', 'Could not delete this workout.');
     } catch (error) {
-      console.error('❌ Erro ao apagar treino:', error);
+      console.error('Failed to delete workout:', error);
     }
   };
 
   const handleDeleteExercise = (exerciseId: string, exerciseName: string) => {
     if (Platform.OS === 'web') {
-      const confirmed = window.confirm(`Tens a certeza que queres remover o "${exerciseName}"?`);
-      if (confirmed) executeDeleteExercise(exerciseId);
+      if (window.confirm(`Remove "${exerciseName}"?`)) executeDeleteExercise(exerciseId);
     } else {
-      Alert.alert(
-        'Apagar Exercício',
-        `Tens a certeza que queres remover o "${exerciseName}"?`,
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Apagar', style: 'destructive', onPress: () => executeDeleteExercise(exerciseId) },
-        ]
-      );
+      Alert.alert('Remove exercise', `Remove "${exerciseName}" from this workout?`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: () => executeDeleteExercise(exerciseId) },
+      ]);
     }
   };
 
   const handleDeleteWorkout = () => {
     if (Platform.OS === 'web') {
-      const confirmed = window.confirm('Tens a certeza que queres destruir este treino e TODOS os seus exercícios?');
-      if (confirmed) executeDeleteWorkout();
+      if (window.confirm('Delete this workout and all of its exercises?')) executeDeleteWorkout();
     } else {
-      Alert.alert(
-        'Apagar Treino',
-        'Tens a certeza que queres destruir este treino e TODOS os seus exercícios?',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Destruir Treino', style: 'destructive', onPress: executeDeleteWorkout },
-        ]
-      );
+      Alert.alert('Delete workout', 'This will remove the workout and all of its exercises.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: executeDeleteWorkout },
+      ]);
     }
   };
 
   const toggleExerciseCompletion = (exerciseId: string) => {
-    setCompletedExercises((prev) => 
-      prev.includes(exerciseId) 
-        ? prev.filter((id) => id !== exerciseId)
-        : [...prev, exerciseId]
+    setCompletedExercises((prev) =>
+      prev.includes(exerciseId) ? prev.filter((id) => id !== exerciseId) : [...prev, exerciseId]
     );
   };
 
   const handleFinishWorkout = async () => {
     if (!user?.id || !workoutDetails?.id) return;
-    
+
     setIsFinishing(true);
     try {
       const endTime = new Date();
@@ -182,20 +165,18 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
       const response = await fetch('http://192.168.1.80:3000/api/logs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, workoutId: workoutDetails.id, durationMinutes })
+        body: JSON.stringify({ userId: user.id, workoutId: workoutDetails.id, durationMinutes }),
       });
 
       if (response.ok) {
-        if (Platform.OS === 'web') alert(`Treino Finalizado! Suaste durante ${durationMinutes} minutos. Máquina! 💪🏆`);
-        else Alert.alert('Treino Finalizado! 🏆', `Suaste durante ${durationMinutes} minutos. Máquina! 💪`);
+        showAlert('Session logged', `${durationMinutes} min recorded.`);
         navigation.navigate('Dashboard');
       } else {
-        throw new Error('Falha ao registar o log na base de dados.');
+        throw new Error('Failed to log workout');
       }
     } catch (error) {
-      console.error('❌ Erro ao finalizar treino:', error);
-      if (Platform.OS === 'web') alert('Erro ao finalizar o treino.');
-      else Alert.alert('Erro', 'Não foi possível registar o treino.');
+      console.error('Failed to finish workout:', error);
+      showAlert('Error', 'Could not log this session.');
     } finally {
       setIsFinishing(false);
     }
@@ -209,12 +190,11 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
         const clonedWorkout = await response.json();
         navigation.replace('WorkoutDetails', { workoutId: clonedWorkout.id });
       } else {
-        throw new Error('Falha ao duplicar o treino na base de dados.');
+        throw new Error('Clone failed');
       }
     } catch (error) {
-      console.error('❌ Erro ao duplicar treino:', error);
-      if (Platform.OS === 'web') alert('Erro ao duplicar o treino.');
-      else Alert.alert('Erro', 'Não foi possível duplicar o treino.');
+      console.error('Failed to duplicate workout:', error);
+      showAlert('Error', 'Could not duplicate this workout.');
     } finally {
       setIsCloning(false);
     }
@@ -224,37 +204,33 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
     const isCompleted = completedExercises.includes(item.id);
 
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         activeOpacity={0.8}
-        style={[styles.exerciseCard, isCompleted && styles.exerciseCardCompleted]}
+        style={[styles.exerciseCard, isCompleted && styles.exerciseDone]}
         onPress={() => toggleExerciseCompletion(item.id)}
       >
+        <View style={[styles.check, isCompleted && styles.checkOn]}>
+          {isCompleted ? <Ionicons name="checkmark" size={14} color={colors.bg} /> : null}
+        </View>
         <View style={styles.exerciseInfo}>
-          {/* ==========================================
-              US 36: AQUI DESENHAMOS O SELO DO PR 🏆
-              ========================================== */}
-          <View style={styles.exerciseNameRow}>
-            <Text style={[styles.exerciseName, isCompleted && styles.exerciseTextCompleted]}>
-              {isCompleted ? '✅ ' : ''}{item.name}
-            </Text>
+          <View style={styles.nameRow}>
+            <Text style={[styles.exerciseName, isCompleted && styles.doneText]}>{item.name}</Text>
             {exercisePRs[item.name] ? (
               <View style={styles.prBadge}>
-                <Text style={styles.prBadgeText}>🏆 PR: {exercisePRs[item.name]}kg</Text>
+                <Text style={styles.prText}>PR {exercisePRs[item.name]} kg</Text>
               </View>
             ) : null}
           </View>
-          
-          <Text style={[styles.exerciseDetails, isCompleted && styles.exerciseTextCompleted]}>
-            {item.sets} séries x {item.reps} reps {item.weight ? `| ${item.weight}kg` : ''}
+          <Text style={[styles.exerciseDetails, isCompleted && styles.doneText]}>
+            {item.sets} sets × {item.reps} reps{item.weight ? ` · ${item.weight} kg` : ''}
           </Text>
         </View>
-        
-        <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('EditExercise', { exercise: item })}>
-            <Text style={styles.iconText}>✏️</Text>
+        <View style={styles.actions}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('EditExercise', { exercise: item })}>
+            <Ionicons name="pencil-outline" size={18} color={colors.muted} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => handleDeleteExercise(item.id, item.name)}>
-            <Text style={styles.iconText}>🗑️</Text>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => handleDeleteExercise(item.id, item.name)}>
+            <Ionicons name="trash-outline" size={18} color={colors.danger} />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -262,121 +238,141 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
   };
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backHeader}>
-        <Text style={styles.backHeaderText}>⬅ Voltar ao Painel</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.title}>{workoutDetails?.name}</Text>
-      {workoutDetails?.description ? (
-        <Text style={styles.description}>{workoutDetails.description}</Text>
-      ) : null}
-
-      <View style={[styles.timerContainer, timerState === 'finished' && styles.timerFinished]}>
-        <Text style={styles.timerTitle}>⏱️ Descanso</Text>
-        {timerState === 'finished' ? (
-          <View style={styles.timerFinishedState}>
-            <Text style={styles.timerFinishedText}>BORA LÁ! ACABOU O DESCANSO!</Text>
-            <TouchableOpacity style={styles.timerBtnStop} onPress={stopTimer}>
-              <Text style={styles.timerBtnText}>Fechar</Text>
-            </TouchableOpacity>
-          </View>
+    <Screen>
+      <View style={styles.pad}>
+        <BackButton onPress={() => navigation.goBack()} label="Home" />
+        {isLoading && !workoutDetails ? (
+          <ActivityIndicator color={colors.accent} />
         ) : (
-          <View style={styles.timerActiveState}>
-            <Text style={styles.timerDisplay}>{formatTime(timeLeft)}</Text>
-            <View style={styles.timerButtons}>
-              <TouchableOpacity style={styles.timerBtn} onPress={() => startTimer(60)}><Text style={styles.timerBtnText}>+ 60s</Text></TouchableOpacity>
-              <TouchableOpacity style={styles.timerBtn} onPress={() => startTimer(90)}><Text style={styles.timerBtnText}>+ 90s</Text></TouchableOpacity>
-              {timerState === 'running' && (
-                <TouchableOpacity style={styles.timerBtnStop} onPress={stopTimer}><Text style={styles.timerBtnText}>Parar</Text></TouchableOpacity>
-              )}
-            </View>
-          </View>
+          <>
+            <Title>{workoutDetails?.name}</Title>
+            {workoutDetails?.description ? (
+              <Text style={styles.description}>{workoutDetails.description}</Text>
+            ) : null}
+          </>
         )}
+
+        <Card style={[styles.timer, timerState === 'finished' && styles.timerDone]}>
+          <Text style={styles.timerLabel}>Rest timer</Text>
+          {timerState === 'finished' ? (
+            <View>
+              <Text style={styles.timerDoneText}>Rest is over. Next set.</Text>
+              <Button title="Dismiss" variant="secondary" onPress={stopTimer} />
+            </View>
+          ) : (
+            <View style={styles.timerRow}>
+              <Text style={styles.timerDisplay}>{formatTime(timeLeft)}</Text>
+              <View style={styles.timerBtns}>
+                <TouchableOpacity style={styles.chip} onPress={() => startTimer(60)}>
+                  <Text style={styles.chipText}>60s</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.chip} onPress={() => startTimer(90)}>
+                  <Text style={styles.chipText}>90s</Text>
+                </TouchableOpacity>
+                {timerState === 'running' ? (
+                  <TouchableOpacity style={styles.chipStop} onPress={stopTimer}>
+                    <Text style={styles.chipStopText}>Stop</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </View>
+          )}
+        </Card>
       </View>
 
-      <View style={styles.listContainer}>
-        <Text style={styles.sectionTitle}>Modo de Treino 🏋️‍♂️</Text>
-        <Text style={styles.instructionText}>Toca num exercício para marcá-lo como concluído!</Text>
-        
-        <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate('AddExercise', { workoutId: workoutDetails?.id })}>
-          <Text style={styles.addButtonText}>+ Adicionar Exercício</Text>
-        </TouchableOpacity>
-
-        <FlatList
-          data={workoutDetails?.exercises || []}
-          keyExtractor={(item) => item.id}
-          renderItem={renderExercise}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>Ainda não tens exercícios neste treino. Começa por adicionar o primeiro aqui em cima!</Text>
-          }
-        />
-      </View>
-
-      <TouchableOpacity style={[styles.finishBtn, isFinishing && styles.finishBtnDisabled]} onPress={handleFinishWorkout} disabled={isFinishing}>
-        <Text style={styles.finishBtnText}>{isFinishing ? 'A registar...' : '🏆 Finalizar Treino'}</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={[styles.cloneWorkoutBtn, isCloning && styles.cloneWorkoutBtnDisabled]} onPress={handleCloneWorkout} disabled={isCloning}>
-        <Text style={styles.cloneWorkoutText}>{isCloning ? 'A duplicar...' : '👯 Duplicar Treino'}</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.deleteWorkoutBtn} onPress={handleDeleteWorkout}>
-        <Text style={styles.deleteWorkoutText}>🗑️ Apagar Treino Inteiro</Text>
-      </TouchableOpacity>
-    </View>
+      <FlatList
+        data={workoutDetails?.exercises || []}
+        keyExtractor={(item) => item.id}
+        renderItem={renderExercise}
+        contentContainerStyle={styles.list}
+        ListHeaderComponent={
+          <View style={styles.listHeader}>
+            <Text style={styles.sectionTitle}>Exercises</Text>
+            <Text style={styles.hint}>Tap a set to mark it done.</Text>
+            <Button
+              title="Add exercise"
+              variant="secondary"
+              icon="add"
+              onPress={() => navigation.navigate('AddExercise', { workoutId: workoutDetails?.id })}
+            />
+          </View>
+        }
+        ListEmptyComponent={
+          isLoading ? null : <Text style={styles.empty}>No exercises yet. Add the first one.</Text>
+        }
+        ListFooterComponent={
+          <View style={styles.footer}>
+            <Button title="Finish session" onPress={handleFinishWorkout} loading={isFinishing} />
+            <Button title="Duplicate workout" variant="secondary" onPress={handleCloneWorkout} loading={isCloning} />
+            <Button title="Delete workout" variant="danger" onPress={handleDeleteWorkout} />
+          </View>
+        }
+      />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#121212', padding: 20, paddingTop: 50 },
-  loadingContainer: { flex: 1, backgroundColor: '#121212', justifyContent: 'center', alignItems: 'center' },
-  backHeader: { marginBottom: 20 },
-  backHeaderText: { color: '#4CAF50', fontSize: 16, fontWeight: 'bold' },
-  title: { fontSize: 32, fontWeight: 'bold', color: '#ffffff', marginBottom: 10 },
-  description: { fontSize: 16, color: '#aaaaaa', marginBottom: 20 },
-  instructionText: { color: '#888', fontStyle: 'italic', marginBottom: 15, textAlign: 'center' },
-  listContainer: { flex: 1, backgroundColor: '#1e1e1e', borderRadius: 12, padding: 15, marginBottom: 20 },
-  sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#ffffff', marginBottom: 5, borderBottomWidth: 1, borderBottomColor: '#333', paddingBottom: 10 },
-  addButton: { backgroundColor: '#4285F4', padding: 12, borderRadius: 8, alignItems: 'center', marginBottom: 15 },
-  addButtonText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold' },
-  emptyText: { fontSize: 15, color: '#aaaaaa', textAlign: 'center', marginTop: 30, lineHeight: 22 },
-  
-  exerciseCard: { backgroundColor: '#2a2a2a', padding: 15, borderRadius: 8, marginBottom: 10, borderLeftWidth: 4, borderLeftColor: '#4285F4', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  pad: { paddingHorizontal: space.lg },
+  description: { color: colors.muted, fontSize: 15, marginTop: 8, marginBottom: 16, lineHeight: 22 },
+  timer: { marginTop: 16, marginBottom: 8 },
+  timerDone: { borderColor: colors.accent },
+  timerLabel: { color: colors.muted, fontSize: 13, fontWeight: '600', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.4 },
+  timerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  timerDisplay: { color: colors.text, fontSize: 32, fontWeight: '700', letterSpacing: -0.8, width: 90 },
+  timerBtns: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', flex: 1 },
+  timerDoneText: { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 12 },
+  chip: {
+    backgroundColor: colors.surface2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: radius.sm,
+  },
+  chipText: { color: colors.text, fontWeight: '600' },
+  chipStop: { backgroundColor: colors.dangerDim, paddingVertical: 8, paddingHorizontal: 12, borderRadius: radius.sm },
+  chipStopText: { color: colors.danger, fontWeight: '600' },
+  list: { paddingHorizontal: space.lg, paddingBottom: 32 },
+  listHeader: { marginTop: 12, marginBottom: 12, gap: 10 },
+  sectionTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
+  hint: { color: colors.muted, fontSize: 13, marginBottom: 4 },
+  exerciseCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  exerciseDone: { opacity: 0.55 },
+  check: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkOn: { backgroundColor: colors.accent, borderColor: colors.accent },
   exerciseInfo: { flex: 1 },
-  
-  // 👇 NOVOS ESTILOS PARA O SELO DE PR DA US 36
-  exerciseNameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginBottom: 5 },
-  prBadge: { backgroundColor: '#FFD700', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, marginLeft: 10, borderWidth: 1, borderColor: '#cca300' },
-  prBadgeText: { color: '#121212', fontSize: 11, fontWeight: 'bold' },
-
-  exerciseName: { fontSize: 18, fontWeight: 'bold', color: '#ffffff' },
-  exerciseDetails: { fontSize: 14, color: '#aaaaaa' },
-  exerciseCardCompleted: { borderLeftColor: '#4CAF50', backgroundColor: '#1a1a1a', opacity: 0.6 },
-  exerciseTextCompleted: { textDecorationLine: 'line-through', color: '#666' },
-  
-  actionButtons: { flexDirection: 'row', alignItems: 'center' },
-  actionBtn: { padding: 5, marginLeft: 10 },
-  iconText: { fontSize: 20 },
-
-  timerContainer: { backgroundColor: '#222', padding: 15, borderRadius: 12, marginBottom: 20, borderWidth: 1, borderColor: '#444' },
-  timerFinished: { backgroundColor: '#b32400', borderColor: '#ff3300' },
-  timerTitle: { fontSize: 16, color: '#fff', fontWeight: 'bold', marginBottom: 10, textAlign: 'center' },
-  timerActiveState: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  timerFinishedState: { alignItems: 'center' },
-  timerFinishedText: { fontSize: 18, fontWeight: 'bold', color: '#fff', marginBottom: 15 },
-  timerDisplay: { fontSize: 32, fontWeight: 'bold', color: '#4CAF50', width: '30%' },
-  timerButtons: { flexDirection: 'row', flex: 1, justifyContent: 'flex-end', gap: 10 },
-  timerBtn: { backgroundColor: '#4285F4', paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8 },
-  timerBtnStop: { backgroundColor: '#ff4444', paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8 },
-  timerBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
-
-  finishBtn: { backgroundColor: '#FFD700', padding: 15, borderRadius: 8, alignItems: 'center', marginBottom: 10, elevation: 5, shadowColor: '#FFD700', shadowOpacity: 0.4, shadowRadius: 8 },
-  finishBtnDisabled: { backgroundColor: '#b39700', opacity: 0.7 },
-  finishBtnText: { color: '#121212', fontSize: 18, fontWeight: 'bold' },
-  cloneWorkoutBtn: { backgroundColor: '#4285F4', padding: 15, borderRadius: 8, alignItems: 'center', marginBottom: 10 },
-  cloneWorkoutBtnDisabled: { backgroundColor: '#2c5aa0', opacity: 0.7 },
-  cloneWorkoutText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold' },
-  deleteWorkoutBtn: { backgroundColor: '#ff4444', padding: 15, borderRadius: 8, alignItems: 'center', marginBottom: 10 },
-  deleteWorkoutText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold' }
+  nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  prBadge: {
+    backgroundColor: colors.accentDim,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.full,
+  },
+  prText: { color: colors.accent, fontSize: 11, fontWeight: '700' },
+  exerciseName: { fontSize: 16, fontWeight: '600', color: colors.text },
+  exerciseDetails: { fontSize: 13, color: colors.muted, marginTop: 4 },
+  doneText: { textDecorationLine: 'line-through', color: colors.muted },
+  actions: { flexDirection: 'row' },
+  iconBtn: { padding: 6 },
+  empty: { color: colors.muted, textAlign: 'center', marginTop: 20, lineHeight: 22 },
+  footer: { marginTop: 8, gap: 10 },
 });

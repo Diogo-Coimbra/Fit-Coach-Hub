@@ -1,9 +1,12 @@
 import React, { useState, useCallback } from 'react';
-import { StyleSheet, Text, View, FlatList, ActivityIndicator, TouchableOpacity, Share, Platform, Alert } from 'react-native';
+import { StyleSheet, Text, View, FlatList, ActivityIndicator, TouchableOpacity, Share, Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/useAuthStore';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import { BackButton, Button, Screen, showAlert, Subtitle, Title } from '../components/ui';
+import { colors, radius, space } from '../theme';
 
 export default function HistoryScreen({ navigation }: any) {
   const { user } = useAuthStore();
@@ -20,7 +23,7 @@ export default function HistoryScreen({ navigation }: any) {
           const data = await response.json();
           setLogs(data);
         } catch (error) {
-          console.error('❌ Erro ao ir buscar o histórico:', error);
+          console.error('Failed to load history:', error);
         } finally {
           setIsLoading(false);
         }
@@ -32,55 +35,46 @@ export default function HistoryScreen({ navigation }: any) {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('pt-PT', {
+    return date.toLocaleDateString('en-GB', {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   };
 
   const handleShare = async (workoutName: string, durationMinutes: number) => {
     try {
-      const message = `Acabei de destruir o treino ${workoutName} em ${durationMinutes} minutos no Fit AI Tracker! 💪🔥`;
-      
       await Share.share({
-        message: message,
+        message: `I just finished ${workoutName} in ${durationMinutes} min on Fit AI Tracker.`,
       });
     } catch (error: any) {
-      console.error('❌ Erro ao partilhar:', error.message);
+      console.error('Share failed:', error.message);
     }
   };
 
-  // ==========================================
-  // US 41: EXPORTAR PARA CSV (AC 2 & AC 3)
-  // ==========================================
   const exportToCSV = async () => {
     if (logs.length === 0) {
-      if (Platform.OS === 'web') alert('Ainda não tens treinos para exportar.');
-      else Alert.alert('Sem dados', 'Ainda não tens treinos para exportar.');
+      showAlert('Nothing to export', 'Finish a workout first.');
       return;
     }
 
     try {
-      // 1. Gerar o texto em formato CSV (Cabeçalho + Linhas)
-      const headerString = 'Data,Nome do Treino,Duracao (minutos)\n';
-      const rowString = logs.map(log => {
-        // Obter apenas a data (sem horas) para o Excel ler melhor
-        const date = new Date(log.createdAt).toLocaleDateString('pt-PT');
-        const name = log.workout?.name || 'Treino Apagado';
-        const duration = log.durationMinutes || 0;
-        
-        // Colocamos o nome entre aspas caso tenha vírgulas
-        return `${date},"${name}",${duration}`;
-      }).join('\n');
+      const headerString = 'Date,Workout Name,Duration (minutes)\n';
+      const rowString = logs
+        .map((log) => {
+          const date = new Date(log.createdAt).toLocaleDateString('en-GB');
+          const name = log.workout?.name || 'Deleted workout';
+          const duration = log.durationMinutes || 0;
+          return `${date},"${name}",${duration}`;
+        })
+        .join('\n');
 
       const csvString = `${headerString}${rowString}`;
-      const fileName = `historico_treinos_${new Date().getTime()}.csv`;
+      const fileName = `workout_history_${new Date().getTime()}.csv`;
 
       if (Platform.OS === 'web') {
-        // Solução nativa para o Browser (faz o download do ficheiro)
         const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
@@ -90,9 +84,7 @@ export default function HistoryScreen({ navigation }: any) {
         link.click();
         document.body.removeChild(link);
       } else {
-        // Solução Mobile usando o Expo FileSystem e Sharing
         const fileUri = `${FileSystem.documentDirectory}${fileName}`;
-        
         await FileSystem.writeAsStringAsync(fileUri, csvString, {
           encoding: FileSystem.EncodingType.UTF8,
         });
@@ -100,112 +92,88 @@ export default function HistoryScreen({ navigation }: any) {
         if (await Sharing.isAvailableAsync()) {
           await Sharing.shareAsync(fileUri, {
             mimeType: 'text/csv',
-            dialogTitle: 'Exportar Histórico de Treinos',
+            dialogTitle: 'Export workout history',
             UTI: 'public.comma-separated-values-text',
           });
         } else {
-          Alert.alert('Erro', 'A partilha não está disponível no teu dispositivo.');
+          showAlert('Error', 'Sharing is not available on this device.');
         }
       }
     } catch (error) {
-      console.error('❌ Erro ao exportar CSV:', error);
-      if (Platform.OS === 'web') alert('Não foi possível exportar os dados.');
-      else Alert.alert('Erro', 'Não foi possível exportar os dados.');
+      console.error('CSV export failed:', error);
+      showAlert('Error', 'Could not export your data.');
     }
   };
 
   const renderLog = ({ item }: any) => {
-    const workoutName = item.workout?.name || 'Treino Apagado';
+    const workoutName = item.workout?.name || 'Deleted workout';
     const duration = item.durationMinutes || 0;
 
     return (
       <View style={styles.logCard}>
-        <View style={styles.logIconContainer}>
-          <Text style={styles.logIcon}>🏆</Text>
-        </View>
         <View style={styles.logInfo}>
           <Text style={styles.workoutName}>{workoutName}</Text>
-          <View style={styles.dateRow}>
-            <Text style={styles.logDate}>📅 {formatDate(item.createdAt)}</Text>
-            {duration > 0 && (
-              <Text style={styles.durationText}>
-                ⏱️ {duration} min
-              </Text>
-            )}
-          </View>
+          <Text style={styles.meta}>
+            {formatDate(item.createdAt)}
+            {duration > 0 ? `  ·  ${duration} min` : ''}
+          </Text>
         </View>
-        
-        <TouchableOpacity 
-          style={styles.shareBtn} 
-          onPress={() => handleShare(workoutName, duration)}
-        >
-          <Text style={styles.shareBtnText}>📤</Text>
+        <TouchableOpacity style={styles.shareBtn} onPress={() => handleShare(workoutName, duration)}>
+          <Ionicons name="share-outline" size={18} color={colors.muted} />
         </TouchableOpacity>
       </View>
     );
   };
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backHeader}>
-        <Text style={styles.backHeaderText}>⬅ Voltar ao Painel</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.title}>Histórico 📅</Text>
-      <Text style={styles.subtitle}>O teu suor e dedicação acumulados.</Text>
-
-      {/* 👇 US 41: BOTÃO DE EXPORTAR (AC 1) */}
-      <TouchableOpacity style={styles.exportButton} onPress={exportToCSV}>
-        <Text style={styles.exportButtonText}>📥 Exportar Dados para CSV</Text>
-      </TouchableOpacity>
+    <Screen>
+      <View style={styles.header}>
+        <BackButton onPress={() => navigation.goBack()} label="Home" />
+        <Title>History</Title>
+        <Subtitle>Your completed sessions.</Subtitle>
+        <View style={{ marginTop: 16 }}>
+          <Button title="Export CSV" variant="secondary" icon="download-outline" onPress={exportToCSV} />
+        </View>
+      </View>
 
       {isLoading ? (
-        <ActivityIndicator size="large" color="#4CAF50" style={{ marginTop: 50 }} />
+        <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: 40 }} />
       ) : (
-        <View style={styles.listContainer}>
-          <FlatList
-            data={logs}
-            keyExtractor={(item) => item.id}
-            renderItem={renderLog}
-            contentContainerStyle={styles.flatListContent}
-            ListEmptyComponent={
-              <Text style={styles.emptyText}>
-                Ainda não finalizaste nenhum treino. Vai ao Modo de Treino suar a camisola e volta aqui! 💪
-              </Text>
-            }
-          />
-        </View>
+        <FlatList
+          data={logs}
+          keyExtractor={(item) => item.id}
+          renderItem={renderLog}
+          contentContainerStyle={styles.list}
+          ListEmptyComponent={<Text style={styles.empty}>No completed workouts yet. Finish a session to see it here.</Text>}
+        />
       )}
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#121212', padding: 20, paddingTop: 50 },
-  backHeader: { marginBottom: 20 },
-  backHeaderText: { color: '#4CAF50', fontSize: 16, fontWeight: 'bold' },
-  title: { fontSize: 32, fontWeight: 'bold', color: '#ffffff', marginBottom: 5 },
-  subtitle: { fontSize: 16, color: '#aaaaaa', marginBottom: 15 },
-  
-  // Estilo do botão de exportação
-  exportButton: { backgroundColor: '#2c5aa0', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginBottom: 20, borderWidth: 1, borderColor: '#4285F4' },
-  exportButtonText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold' },
-
-  listContainer: { flex: 1, backgroundColor: '#1e1e1e', borderRadius: 12, padding: 15 },
-  flatListContent: { paddingBottom: 20 },
-  
-  logCard: { flexDirection: 'row', backgroundColor: '#2a2a2a', padding: 15, borderRadius: 8, marginBottom: 10, alignItems: 'center' },
-  logIconContainer: { backgroundColor: '#333', padding: 10, borderRadius: 8, marginRight: 15 },
-  logIcon: { fontSize: 24 },
+  header: { paddingHorizontal: space.lg },
+  list: { paddingHorizontal: space.lg, paddingTop: 16, paddingBottom: 32 },
+  logCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    padding: 16,
+    borderRadius: radius.md,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   logInfo: { flex: 1 },
-  workoutName: { fontSize: 18, fontWeight: 'bold', color: '#ffffff', marginBottom: 5 },
-  
-  dateRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  logDate: { fontSize: 14, color: '#4285F4' },
-  durationText: { color: '#F29900', fontSize: 13, marginLeft: 10, fontWeight: 'bold' },
-  
-  shareBtn: { backgroundColor: '#333', padding: 10, borderRadius: 8, marginLeft: 10, borderWidth: 1, borderColor: '#444' },
-  shareBtnText: { fontSize: 18 },
-
-  emptyText: { fontSize: 15, color: '#aaaaaa', textAlign: 'center', marginTop: 30, lineHeight: 22 },
+  workoutName: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 4 },
+  meta: { fontSize: 13, color: colors.muted },
+  shareBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface2,
+  },
+  empty: { fontSize: 15, color: colors.muted, textAlign: 'center', marginTop: 28, lineHeight: 22 },
 });

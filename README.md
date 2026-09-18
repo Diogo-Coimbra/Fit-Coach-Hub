@@ -1,4 +1,4 @@
-# 🏋️‍♂️ Fit AI Tracker
+# 🏋️‍♂️ Fit Coach Hub
 
 > An AI-powered fitness and nutrition tracker built to optimize gym performance and diet management.
 

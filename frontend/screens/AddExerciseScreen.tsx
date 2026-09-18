@@ -1,86 +1,462 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { BackButton, Button, Field, Screen, Title } from '../components/ui';
-import { space } from '../theme';
+import React, { useState, useMemo } from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { BackButton, Button, Field, Screen, Title, Card } from '../components/ui';
+import { ColorScheme, radius, space } from '../theme';
+import { api } from '../services/api';
+import { useTheme } from '../store/useThemeStore';
+import { useLanguage } from '../store/useLanguageStore';
+import {
+  EXERCISE_LIBRARY,
+  MUSCLE_CATEGORIES,
+  LibraryExercise,
+} from '../data/exerciseLibrary';
 
 export default function AddExerciseScreen({ route, navigation }: any) {
   const { workoutId } = route.params;
+  const { colors } = useTheme();
+  const { t } = useLanguage();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLibraryExpanded, setIsLibraryExpanded] = useState(true);
+
+  // Form State
   const [name, setName] = useState('');
   const [sets, setSets] = useState('3');
   const [reps, setReps] = useState('10');
   const [weight, setWeight] = useState('');
+  const [restSeconds, setRestSeconds] = useState('90');
+  const [notes, setNotes] = useState('');
+  const [selectedExerciseMeta, setSelectedExerciseMeta] = useState<LibraryExercise | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Filtered exercises from library
+  const filteredExercises = useMemo(() => {
+    return EXERCISE_LIBRARY.filter((ex) => {
+      const matchesCategory =
+        selectedCategory === 'all' || ex.category === selectedCategory;
+      const matchesQuery =
+        !searchQuery.trim() ||
+        ex.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ex.equipmentLabel.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesCategory && matchesQuery;
+    });
+  }, [selectedCategory, searchQuery]);
+
+  const handleSelectFromLibrary = (exercise: LibraryExercise) => {
+    setName(exercise.name);
+    setSets(String(exercise.defaultSets));
+    setReps(String(exercise.defaultReps));
+    setRestSeconds(String(exercise.defaultRestSeconds));
+    setNotes(exercise.instructions);
+    setSelectedExerciseMeta(exercise);
+    setIsLibraryExpanded(false); // Recolhe a biblioteca para focar nos detalhes
+  };
+
+  const handleClearSelection = () => {
+    setSelectedExerciseMeta(null);
+  };
 
   const handleAddExercise = async () => {
     if (!name.trim()) {
-      Alert.alert('Name required', 'Please enter an exercise name.');
+      Alert.alert(t('common.attention'), t('workouts.nameRequiredAlert'));
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('http://192.168.1.80:3000/api/exercises', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          sets: parseInt(sets) || 3,
-          reps: parseInt(reps) || 10,
-          weight: weight ? parseFloat(weight) : null,
-          workoutId,
-        }),
+      await api.post('/api/exercises', {
+        name: name.trim(),
+        sets: parseInt(sets) || 3,
+        reps: parseInt(reps) || 10,
+        weight: weight ? parseFloat(weight.replace(',', '.')) : null,
+        restSeconds: parseInt(restSeconds) || 90,
+        notes: notes.trim() || undefined,
+        workoutId,
       });
 
-      if (response.ok) {
-        navigation.goBack();
-      } else {
-        Alert.alert('Error', 'Could not save this exercise.');
-      }
-    } catch (error) {
-      console.error('Failed to add exercise:', error);
-      Alert.alert('Error', 'Could not reach the server.');
+      navigation.goBack();
+    } catch (error: any) {
+      console.error('Falha ao adicionar exercício:', error);
+      Alert.alert(t('common.error'), error.message || t('common.error'));
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const getCategoryLabel = (catId: string) => {
+    switch (catId) {
+      case 'chest':
+        return t('workouts.catChest');
+      case 'back':
+        return t('workouts.catBack');
+      case 'legs':
+        return t('workouts.catLegs');
+      case 'shoulders':
+        return t('workouts.catShoulders');
+      case 'arms':
+        return t('workouts.catArms');
+      case 'core':
+        return t('workouts.catCore');
+      default:
+        return t('workouts.catAll');
+    }
+  };
+
   return (
     <Screen>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <ScrollView contentContainerStyle={styles.content}>
           <BackButton onPress={() => navigation.goBack()} />
-          <Title>Add exercise</Title>
+          <Title>{t('workouts.addExerciseTitle')}</Title>
 
-          <Field label="Exercise" placeholder="Bench press" value={name} onChangeText={setName} />
+          {/* Secção da Biblioteca de Exercícios */}
+          <Card style={styles.libraryCard}>
+            <TouchableOpacity
+              style={styles.libraryHeader}
+              onPress={() => setIsLibraryExpanded((prev) => !prev)}
+            >
+              <View style={styles.libraryHeaderLeft}>
+                <Ionicons name="barbell-outline" size={20} color={colors.accent} />
+                <Text style={styles.libraryTitle}>{t('workouts.selectFromLibrary')}</Text>
+              </View>
+              <Ionicons
+                name={isLibraryExpanded ? 'chevron-up' : 'chevron-down'}
+                size={20}
+                color={colors.muted}
+              />
+            </TouchableOpacity>
+
+            {isLibraryExpanded && (
+              <View style={styles.libraryBody}>
+                {/* Barra de Pesquisa */}
+                <View style={styles.searchBar}>
+                  <Ionicons name="search-outline" size={17} color={colors.muted} />
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder={t('workouts.searchExercise')}
+                    placeholderTextColor={colors.muted}
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                  />
+                  {searchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => setSearchQuery('')}>
+                      <Ionicons name="close-circle" size={17} color={colors.muted} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Filtro de Categorias Musculares */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.categoriesRow}
+                >
+                  {MUSCLE_CATEGORIES.map((cat) => {
+                    const isSelected = selectedCategory === cat.id;
+                    return (
+                      <TouchableOpacity
+                        key={cat.id}
+                        style={[styles.categoryChip, isSelected && styles.categoryChipActive]}
+                        onPress={() => setSelectedCategory(cat.id)}
+                      >
+                        <Text
+                          style={[
+                            styles.categoryChipText,
+                            isSelected && styles.categoryChipTextActive,
+                          ]}
+                        >
+                          {getCategoryLabel(cat.id)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+
+                {/* Lista de Exercícios Filtrados */}
+                <View style={styles.exerciseList}>
+                  {filteredExercises.slice(0, 6).map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.exerciseItem}
+                      onPress={() => handleSelectFromLibrary(item)}
+                    >
+                      <View style={styles.exerciseItemInfo}>
+                        <Text style={styles.exerciseItemName}>{item.name}</Text>
+                        <View style={styles.exerciseItemMeta}>
+                          <Text style={styles.exerciseItemBadge}>{item.equipmentLabel}</Text>
+                          <Text style={styles.exerciseItemDetail}>
+                            {item.defaultSets} {t('workouts.sets').toLowerCase()} • {item.defaultReps} {t('workouts.repShort')}
+                          </Text>
+                        </View>
+                      </View>
+                      <Ionicons name="add-circle-outline" size={22} color={colors.accent} />
+                    </TouchableOpacity>
+                  ))}
+                  {filteredExercises.length > 6 && (
+                    <Text style={styles.moreResultsHint}>
+                      +{filteredExercises.length - 6} exercícios disponíveis. Usa a pesquisa para refinar.
+                    </Text>
+                  )}
+                </View>
+              </View>
+            )}
+          </Card>
+
+          {/* Tag de Exercício Selecionado da Biblioteca */}
+          {selectedExerciseMeta && (
+            <View style={styles.selectedBadge}>
+              <View style={styles.selectedBadgeLeft}>
+                <Ionicons name="checkmark-circle" size={18} color={colors.accent} />
+                <Text style={styles.selectedBadgeText}>
+                  Biblioteca: {getCategoryLabel(selectedExerciseMeta.category)} • {selectedExerciseMeta.equipmentLabel}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={handleClearSelection}>
+                <Ionicons name="close" size={18} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Formulário de Configuração do Exercício */}
+          <Field
+            label={t('workouts.exerciseName')}
+            placeholder={t('workouts.exerciseNamePlaceholder')}
+            value={name}
+            onChangeText={setName}
+          />
 
           <View style={styles.row}>
             <View style={styles.half}>
-              <Field label="Sets" keyboardType="numeric" value={sets} onChangeText={setSets} />
+              <Field
+                label={t('workouts.targetSets')}
+                keyboardType="numeric"
+                value={sets}
+                onChangeText={setSets}
+              />
             </View>
             <View style={styles.half}>
-              <Field label="Reps" keyboardType="numeric" value={reps} onChangeText={setReps} />
+              <Field
+                label={t('workouts.repsLabel')}
+                keyboardType="numeric"
+                value={reps}
+                onChangeText={setReps}
+              />
+            </View>
+          </View>
+
+          <View style={styles.row}>
+            <View style={styles.half}>
+              <Field
+                label={t('workouts.suggestedWeight')}
+                placeholder="50"
+                keyboardType="numeric"
+                value={weight}
+                onChangeText={setWeight}
+              />
+            </View>
+            <View style={styles.half}>
+              <Field
+                label={t('workouts.restSecondsLabel')}
+                placeholder="90"
+                keyboardType="numeric"
+                value={restSeconds}
+                onChangeText={setRestSeconds}
+              />
             </View>
           </View>
 
           <Field
-            label="Weight (kg), optional"
-            placeholder="60"
-            keyboardType="numeric"
-            value={weight}
-            onChangeText={setWeight}
+            label={t('workouts.executionNotes')}
+            placeholder={t('workouts.executionNotesPlaceholder')}
+            value={notes}
+            onChangeText={setNotes}
+            multiline
+            numberOfLines={3}
+            style={{ minHeight: 80, textAlignVertical: 'top' }}
           />
 
-          <Button title="Add to workout" onPress={handleAddExercise} loading={isSubmitting} />
-          <Button title="Cancel" variant="ghost" onPress={() => navigation.goBack()} />
+          <Button
+            title={t('workouts.addToPlan')}
+            onPress={handleAddExercise}
+            loading={isSubmitting}
+          />
+          <Button
+            title={t('common.cancel')}
+            variant="ghost"
+            onPress={() => navigation.goBack()}
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  content: { paddingHorizontal: space.lg, paddingBottom: 40 },
-  row: { flexDirection: 'row', gap: 12 },
-  half: { flex: 1 },
-});
+const getStyles = (colors: ColorScheme) =>
+  StyleSheet.create({
+    content: {
+      paddingHorizontal: space.lg,
+      paddingBottom: 40,
+    },
+    libraryCard: {
+      marginBottom: space.md,
+      padding: 0,
+      overflow: 'hidden',
+    },
+    libraryHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: space.md,
+    },
+    libraryHeaderLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space.sm,
+    },
+    libraryTitle: {
+      color: colors.text,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    libraryBody: {
+      paddingHorizontal: space.md,
+      paddingBottom: space.md,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      paddingTop: space.sm,
+    },
+    searchBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface2,
+      borderRadius: radius.md,
+      paddingHorizontal: space.sm,
+      paddingVertical: Platform.OS === 'ios' ? 8 : 4,
+      marginBottom: space.sm,
+      borderWidth: 1,
+      borderColor: colors.border,
+      gap: 6,
+    },
+    searchInput: {
+      flex: 1,
+      color: colors.text,
+      fontSize: 14,
+      paddingVertical: 2,
+    },
+    categoriesRow: {
+      flexDirection: 'row',
+      gap: 6,
+      marginBottom: space.sm,
+      paddingVertical: 4,
+    },
+    categoryChip: {
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: radius.full,
+      backgroundColor: colors.surface2,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    categoryChipActive: {
+      backgroundColor: colors.accent,
+      borderColor: colors.accent,
+    },
+    categoryChipText: {
+      color: colors.muted,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    categoryChipTextActive: {
+      color: colors.bg,
+    },
+    exerciseList: {
+      gap: 8,
+    },
+    exerciseItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 8,
+      paddingHorizontal: 10,
+      backgroundColor: colors.surface2,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    exerciseItemInfo: {
+      flex: 1,
+      marginRight: space.sm,
+    },
+    exerciseItemName: {
+      color: colors.text,
+      fontSize: 14,
+      fontWeight: '500',
+      marginBottom: 2,
+    },
+    exerciseItemMeta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    exerciseItemBadge: {
+      color: colors.accent,
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    exerciseItemDetail: {
+      color: colors.muted,
+      fontSize: 11,
+    },
+    moreResultsHint: {
+      color: colors.muted,
+      fontSize: 12,
+      textAlign: 'center',
+      marginTop: 4,
+    },
+    selectedBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.surface2,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: radius.md,
+      marginBottom: space.sm,
+      borderLeftWidth: 3,
+      borderLeftColor: colors.accent,
+    },
+    selectedBadgeLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    selectedBadgeText: {
+      color: colors.text,
+      fontSize: 12,
+      fontWeight: '500',
+    },
+    row: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    half: {
+      flex: 1,
+    },
+  });

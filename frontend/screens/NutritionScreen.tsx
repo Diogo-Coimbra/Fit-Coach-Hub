@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,10 +12,16 @@ import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../store/useAuthStore';
 import { BackButton, Button, Card, ProgressBar, Screen, showAlert, Subtitle, Title } from '../components/ui';
-import { colors, radius, space } from '../theme';
+import { ColorScheme, radius, space } from '../theme';
+import { api } from '../services/api';
+import { useTheme } from '../store/useThemeStore';
+import { useLanguage } from '../store/useLanguageStore';
 
 export default function NutritionScreen({ navigation }: any) {
   const { user } = useAuthStore();
+  const { colors } = useTheme();
+  const { t } = useLanguage();
+  const styles = useMemo(() => getStyles(colors), [colors]);
   const [todayMeals, setTodayMeals] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -32,9 +38,8 @@ export default function NutritionScreen({ navigation }: any) {
     if (!user?.id) return;
     try {
       setIsLoading(true);
-      const response = await fetch(`http://192.168.1.80:3000/api/nutrition/meals/${user.id}/today`);
-      const data = await response.json();
-      setTodayMeals(data);
+      const data = await api.get(`/api/nutrition/meals/${user.id}/today`);
+      setTodayMeals(data || []);
     } catch (error) {
       console.error('Failed to load meals:', error);
     } finally {
@@ -70,29 +75,37 @@ export default function NutritionScreen({ navigation }: any) {
         })()
       : await ImagePicker.launchImageLibraryAsync(options);
 
-    if (!result.canceled && result.assets[0].base64) {
-      setTempImageUri(result.assets[0].uri);
-      analyzeImageWithAI(result.assets[0].base64);
+    if (!result.canceled && result.assets && result.assets[0]) {
+      const asset = result.assets[0];
+      let base64 = asset.base64;
+      if (base64 && !base64.startsWith('data:')) {
+        base64 = `data:image/jpeg;base64,${base64}`;
+      }
+
+      setTempImageUri(asset.uri);
+      
+      // Envia a imagem para o servidor em paralelo com a análise da IA
+      if (base64) {
+        api.post('/api/uploads', { imageBase64: base64 })
+          .then((res) => {
+            if (res?.url) setTempImageUri(res.url);
+          })
+          .catch((err) => console.warn('Falha no upload da foto da refeição:', err));
+
+        analyzeImageWithAI(asset.base64!);
+      }
     }
   };
 
   const analyzeImageWithAI = async (base64Image: string) => {
     try {
       setIsAnalyzing(true);
-      const response = await fetch('http://192.168.1.80:3000/api/nutrition/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64Image }),
-      });
-
-      if (!response.ok) throw new Error('AI failed');
-
-      const data = await response.json();
+      const data = await api.post('/api/nutrition/analyze', { imageBase64: base64Image });
       setAiResult(data);
       setModalVisible(true);
-    } catch (error) {
-      console.error('Nutrition analysis failed:', error);
-      showAlert('Could not analyze', 'Try another photo with the plate clearly visible.');
+    } catch (error: any) {
+      console.error('Falha na análise nutricional:', error);
+      showAlert(t('nutrition.cannotAnalyze'), error.message || t('nutrition.cannotAnalyzeTips'));
     } finally {
       setIsAnalyzing(false);
     }
@@ -102,31 +115,22 @@ export default function NutritionScreen({ navigation }: any) {
     if (!user?.id || !aiResult) return;
 
     try {
-      const response = await fetch('http://192.168.1.80:3000/api/nutrition/meals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          name: aiResult.name,
-          calories: aiResult.calories,
-          protein: aiResult.protein,
-          carbs: aiResult.carbs,
-          fat: aiResult.fat,
-          imageUri: tempImageUri,
-        }),
+      await api.post('/api/nutrition/meals', {
+        name: aiResult.name,
+        calories: aiResult.calories,
+        protein: aiResult.protein,
+        carbs: aiResult.carbs,
+        fat: aiResult.fat,
+        imageUri: tempImageUri,
       });
 
-      if (response.ok) {
-        setModalVisible(false);
-        setAiResult(null);
-        setTempImageUri(null);
-        fetchTodayMeals();
-      } else {
-        throw new Error('Save failed');
-      }
-    } catch (error) {
-      console.error('Failed to save meal:', error);
-      showAlert('Error', 'Could not save this meal.');
+      setModalVisible(false);
+      setAiResult(null);
+      setTempImageUri(null);
+      fetchTodayMeals();
+    } catch (error: any) {
+      console.error('Falha ao guardar refeição:', error);
+      showAlert(t('common.error'), error.message || t('common.error'));
     }
   };
 
@@ -137,7 +141,7 @@ export default function NutritionScreen({ navigation }: any) {
         <Text style={styles.mealCalories}>{item.calories} kcal</Text>
       </View>
       <Text style={styles.macroText}>
-        P {item.protein}g  ·  C {item.carbs}g  ·  F {item.fat}g
+        {t('nutrition.protein')}: {item.protein}g · {t('nutrition.carbs')}: {item.carbs}g · {t('nutrition.fat')}: {item.fat}g
       </Text>
     </View>
   );
@@ -145,9 +149,9 @@ export default function NutritionScreen({ navigation }: any) {
   return (
     <Screen>
       <View style={styles.header}>
-        <BackButton onPress={() => navigation.goBack()} label="Home" />
-        <Title>Nutrition</Title>
-        <Subtitle>Log meals from a photo.</Subtitle>
+        <BackButton onPress={() => navigation.goBack()} />
+        <Title>{t('nutrition.title')}</Title>
+        <Subtitle>{t('nutrition.subtitle')}</Subtitle>
       </View>
 
       <FlatList
@@ -158,7 +162,7 @@ export default function NutritionScreen({ navigation }: any) {
         ListHeaderComponent={
           <View>
             <Card style={styles.summary}>
-              <Text style={styles.summaryLabel}>Today</Text>
+              <Text style={styles.summaryLabel}>{t('nutrition.todayTotal')}</Text>
               <View style={styles.calRow}>
                 <Text style={styles.calValue}>{consumedCalories}</Text>
                 <Text style={styles.calGoal}> / {goalCalories} kcal</Text>
@@ -166,19 +170,19 @@ export default function NutritionScreen({ navigation }: any) {
               <ProgressBar value={calorieProgress} />
               <View style={styles.macros}>
                 <View style={styles.macroBox}>
-                  <Text style={styles.macroLabel}>Protein</Text>
+                  <Text style={styles.macroLabel}>{t('nutrition.protein')}</Text>
                   <Text style={styles.macroValue}>
                     {consumedProtein}/{goalProtein}g
                   </Text>
                 </View>
                 <View style={styles.macroBox}>
-                  <Text style={styles.macroLabel}>Carbs</Text>
+                  <Text style={styles.macroLabel}>{t('nutrition.carbs')}</Text>
                   <Text style={styles.macroValue}>
                     {consumedCarbs}/{goalCarbs}g
                   </Text>
                 </View>
                 <View style={styles.macroBox}>
-                  <Text style={styles.macroLabel}>Fat</Text>
+                  <Text style={styles.macroLabel}>{t('nutrition.fat')}</Text>
                   <Text style={styles.macroValue}>
                     {consumedFat}/{goalFat}g
                   </Text>
@@ -189,44 +193,44 @@ export default function NutritionScreen({ navigation }: any) {
             {isAnalyzing ? (
               <View style={styles.analyzing}>
                 <ActivityIndicator color={colors.accent} />
-                <Text style={styles.analyzingText}>Analyzing your plate...</Text>
+                <Text style={styles.analyzingText}>{t('nutrition.analyzingFood')}</Text>
               </View>
             ) : (
               <View style={styles.actions}>
                 <View style={{ flex: 1 }}>
-                  <Button title="Camera" icon="camera-outline" onPress={() => handlePickImage(true)} />
+                  <Button title={t('nutrition.scanMeal')} icon="camera-outline" onPress={() => handlePickImage(true)} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Button title="Gallery" variant="secondary" icon="image-outline" onPress={() => handlePickImage(false)} />
+                  <Button title={t('nutrition.galleryMeal')} variant="secondary" icon="image-outline" onPress={() => handlePickImage(false)} />
                 </View>
               </View>
             )}
 
-            <Text style={styles.sectionTitle}>Today's meals</Text>
+            <Text style={styles.sectionTitle}>{t('nutrition.todayMeals')}</Text>
             {isLoading ? <ActivityIndicator color={colors.accent} style={{ marginBottom: 12 }} /> : null}
           </View>
         }
         ListEmptyComponent={
-          isLoading ? null : <Text style={styles.empty}>No meals logged today. Photograph your plate to start.</Text>
+          isLoading ? null : <Text style={styles.empty}>{t('nutrition.noMealsToday')}</Text>
         }
       />
 
       <Modal animationType="fade" transparent visible={modalVisible}>
         <View style={styles.overlay}>
           <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Meal estimate</Text>
+            <Text style={styles.modalTitle}>{t('nutrition.nutritionEstimate')}</Text>
             {tempImageUri ? <Image source={{ uri: tempImageUri }} style={styles.preview} /> : null}
             <Text style={styles.aiName}>{aiResult?.name}</Text>
             <Text style={styles.aiCal}>{aiResult?.calories} kcal</Text>
             <Text style={styles.aiMacros}>
-              P {aiResult?.protein}g  ·  C {aiResult?.carbs}g  ·  F {aiResult?.fat}g
+              {t('nutrition.protein')}: {aiResult?.protein}g · {t('nutrition.carbs')}: {aiResult?.carbs}g · {t('nutrition.fat')}: {aiResult?.fat}g
             </Text>
             <View style={styles.modalBtns}>
               <View style={{ flex: 1 }}>
-                <Button title="Cancel" variant="secondary" onPress={() => setModalVisible(false)} />
+                <Button title={t('nutrition.discard')} variant="secondary" onPress={() => setModalVisible(false)} />
               </View>
               <View style={{ flex: 1 }}>
-                <Button title="Save meal" onPress={confirmAndSaveMeal} />
+                <Button title={t('nutrition.saveMeal')} onPress={confirmAndSaveMeal} />
               </View>
             </View>
           </View>
@@ -236,7 +240,7 @@ export default function NutritionScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ColorScheme) => StyleSheet.create({
   header: { paddingHorizontal: space.lg },
   list: { paddingHorizontal: space.lg, paddingTop: 16, paddingBottom: 40 },
   summary: { marginBottom: 16 },

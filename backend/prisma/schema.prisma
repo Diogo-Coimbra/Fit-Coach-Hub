@@ -30,14 +30,22 @@ model User {
   dailyCarbs    Int          @default(300)
   dailyFat      Int          @default(80)
 
+  // Subscrição e Período de Testes (PT SaaS)
+  trialEndsAt          DateTime?
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  subscriptionStatus   String?      @default("trialing")
+
   createdAt     DateTime     @default(now())
 
-  workouts      Workout[]
-  logs          WorkoutLog[]
-  bodyMetrics   BodyMetric[]
-  meals         MealLog[]
-  clients       CoachClient[] @relation("CoachClients")
-  coaches       CoachClient[] @relation("ClientCoaches")
+  workouts         Workout[]
+  assignedWorkouts Workout[]     @relation("AssignedWorkouts")
+  logs             WorkoutLog[]
+  bodyMetrics      BodyMetric[]
+  meals            MealLog[]
+  clients          CoachClient[] @relation("CoachClients")
+  coaches          CoachClient[] @relation("ClientCoaches")
+  sentInvites      CoachInvite[] @relation("CoachInvites")
 }
 
 model CoachClient {
@@ -64,6 +72,12 @@ model Workout {
   // O onDelete: Cascade significa que se apagares a tua conta, os teus treinos são apagados também
   userId      String     
   user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // PT que atribuiu este treino (opcional)
+  assignedById String?
+  assignedBy   User?     @relation("AssignedWorkouts", fields: [assignedById], references: [id], onDelete: SetNull)
+  isTemplate   Boolean   @default(false)
+  category     String?   // Categoria (ex: Força, Hipertrofia, Mobilidade, Iniciante)
   
   // Relação: Um treino tem uma lista de exercícios
   exercises   Exercise[] 
@@ -81,32 +95,68 @@ model Exercise {
   sets        Int      @default(3) // Séries padrão: 3
   reps        Int      @default(10) // Repetições padrão: 10
   weight      Float?   // Peso em kg (opcional)
+  restSeconds Int?     @default(90) // Descanso sugerido em segundos
+  notes       String?  // Instruções de postura/execução do PT
   
   // Relação: A que treino pertence este exercício?
   workoutId   String   
   workout     Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
   
   createdAt   DateTime @default(now())
+
+  setLogs     WorkoutSetLog[]
 }
 
 model WorkoutLog {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now()) // Regista automaticamente o dia e hora
-  userId    String
-  workoutId String
+  id              String   @id @default(uuid())
+  createdAt       DateTime @default(now()) // Regista automaticamente o dia e hora
+  userId          String
+  workoutId       String
   durationMinutes Int      @default(0)
+  notes           String?  // Feedback pós-treino do aluno ao PT
+  rating          Int?     // Nível de esforço/satisfação de 1 a 5
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workout   Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workout         Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+
+  setLogs         WorkoutSetLog[]
+}
+
+model WorkoutSetLog {
+  id           String     @id @default(uuid())
+  workoutLogId String
+  exerciseId   String?
+  exerciseName String
+  setNumber    Int
+  reps         Int
+  weight       Float?     // Carga utilizada em kg
+  completed    Boolean    @default(true)
+  rpe          Float?     // Escala de esforço subjetivo (ex: 8.5)
+  setType      String?    @default("NORMAL") // NORMAL, WARMUP, DROPSET, FAILURE
+
+  workoutLog   WorkoutLog @relation(fields: [workoutLogId], references: [id], onDelete: Cascade)
+  exercise     Exercise?  @relation(fields: [exerciseId], references: [id], onDelete: SetNull)
+
+  createdAt    DateTime   @default(now())
+
+  @@index([workoutLogId])
+  @@index([exerciseName])
 }
 
 model BodyMetric {
   id        String   @id @default(uuid())
   userId    String
   weight    Float
+  chest     Float?   // Peito em cm
+  waist     Float?   // Cintura em cm
+  arms      Float?   // Braço em cm
+  thighs    Float?   // Coxa em cm
+  bodyFat   Float?   // % Gordura corporal estimada
+  photoUrl  String?  // Fotografia de avaliação corporal
+  notes     String?  // Observações da avaliação física
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model MealLog {
@@ -121,4 +171,18 @@ model MealLog {
   createdAt DateTime @default(now())
 
   user      User     @relation(fields: [userId], references: [id])
+}
+
+model CoachInvite {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  coachId     String
+  coach       User     @relation("CoachInvites", fields: [coachId], references: [id], onDelete: Cascade)
+  clientEmail String?
+  status      String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+
+  @@index([coachId])
+  @@index([code])
 }

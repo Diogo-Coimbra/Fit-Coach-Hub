@@ -6,6 +6,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
 import { useAuthStore } from './store/useAuthStore';
+import { useThemeStore } from './store/useThemeStore';
+import { useLanguageStore } from './store/useLanguageStore';
 import LoginScreen from './screens/LoginScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import ProfileScreen from './screens/ProfileScreen';
@@ -16,33 +18,38 @@ import AIGeneratorScreen from './screens/AIGeneratorScreen';
 import EditExerciseScreen from './screens/EditExerciseScreen';
 import HistoryScreen from './screens/HistoryScreen';
 import NutritionScreen from './screens/NutritionScreen';
-import { colors } from './theme';
+import ClientDetailsScreen from './screens/ClientDetailsScreen';
+import TemplatesScreen from './screens/TemplatesScreen';
 
 const Stack = createNativeStackNavigator();
 
-const navTheme = {
-  ...DefaultTheme,
-  colors: {
-    ...DefaultTheme.colors,
-    background: colors.bg,
-    card: colors.bg,
-    text: colors.text,
-    border: colors.border,
-    primary: colors.accent,
-  },
-};
-
 export default function App() {
   const { user, isLoading, checkSession } = useAuthStore();
+  const { mode, colors, initTheme } = useThemeStore();
+  const { initLanguage } = useLanguageStore();
 
   useEffect(() => {
     checkSession();
+    initTheme();
+    initLanguage();
   }, []);
+
+  const navTheme = {
+    ...DefaultTheme,
+    colors: {
+      ...DefaultTheme.colors,
+      background: colors.bg,
+      card: colors.surface,
+      text: colors.text,
+      border: colors.border,
+      primary: colors.accent,
+    },
+  };
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <StatusBar style="light" />
+      <View style={[styles.loadingContainer, { backgroundColor: colors.bg }]}>
+        <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
         <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
@@ -50,7 +57,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" />
+      <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
       <NavigationContainer theme={navTheme}>
         <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
           {user ? (
@@ -64,6 +71,8 @@ export default function App() {
               <Stack.Screen name="EditExercise" component={EditExerciseScreen} />
               <Stack.Screen name="History" component={HistoryScreen} />
               <Stack.Screen name="Nutrition" component={NutritionScreen} />
+              <Stack.Screen name="ClientDetails" component={ClientDetailsScreen} />
+              <Stack.Screen name="Templates" component={TemplatesScreen} />
             </>
           ) : (
             <Stack.Screen name="Login" component={LoginScreen} />
@@ -77,7 +86,6 @@ export default function App() {
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
-    backgroundColor: colors.bg,
     justifyContent: 'center',
     alignItems: 'center',
   },

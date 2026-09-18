@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -7,71 +7,116 @@ import {
   FlatList,
   ActivityIndicator,
   Image,
+  Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuthStore } from '../store/useAuthStore';
 import { Card, ProgressBar, Screen } from '../components/ui';
-import { colors, radius, space } from '../theme';
+import { useAuthStore } from '../store/useAuthStore';
+import { ColorScheme, radius, space } from '../theme';
+import { api } from '../services/api';
+import InviteModal from '../components/InviteModal';
+import SubscriptionPaywallModal from '../components/SubscriptionPaywallModal';
+import { useTheme } from '../store/useThemeStore';
+import { useLanguage } from '../store/useLanguageStore';
 
 export default function DashboardScreen({ navigation }: any) {
-  const { user } = useAuthStore();
+  const { user, trial, coach, setUser, setTrial } = useAuthStore();
+  const { colors } = useTheme();
+  const { t } = useLanguage();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+  const isCoach = user?.role === 'COACH';
+  const isLocked = isCoach && !!trial?.isExpired && user?.subscriptionStatus !== 'active';
 
-  const [workouts, setWorkouts] = useState<any[]>([]);
+  // Estados Comuns
   const [isLoading, setIsLoading] = useState(true);
+  const [showPaywallModal, setShowPaywallModal] = useState(false);
+
+  // Estados do Treinador (COACH)
+  const [clients, setClients] = useState<any[]>([]);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+
+  // Estados do Aluno (CLIENT)
+  const [workouts, setWorkouts] = useState<any[]>([]);
   const [totalLogs, setTotalLogs] = useState(0);
   const [weeklyLogs, setWeeklyLogs] = useState(0);
   const [totalMinutes, setTotalMinutes] = useState(0);
 
   const WEEKLY_GOAL = user?.weeklyGoal || 3;
 
+  const fetchCoachData = async () => {
+    try {
+      setIsLoading(true);
+      const [clientsData, meData] = await Promise.all([
+        api.get('/api/coach/clients'),
+        api.get('/api/auth/me'),
+      ]);
+      setClients(clientsData || []);
+      if (meData?.user) setUser(meData.user);
+      if (meData?.trial) setTrial(meData.trial);
+    } catch (error: any) {
+      console.error('Erro ao carregar clientes do PT:', error);
+      try {
+        const meData = await api.get('/api/auth/me');
+        if (meData?.user) setUser(meData.user);
+        if (meData?.trial) setTrial(meData.trial);
+      } catch (meErr) {
+        // silencia
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchClientData = async () => {
+    if (!user?.id) return;
+    try {
+      setIsLoading(true);
+
+      const [workoutsData, logsData] = await Promise.all([
+        api.get('/api/workouts'),
+        api.get(`/api/logs/${user.id}`),
+      ]);
+
+      setWorkouts(workoutsData || []);
+      setTotalLogs(logsData.length || 0);
+
+      const summedMinutes = logsData.reduce((acc: number, log: any) => {
+        return acc + (log.durationMinutes || 0);
+      }, 0);
+      setTotalMinutes(summedMinutes);
+
+      const now = new Date();
+      const dayOfWeek = now.getDay() || 7;
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - dayOfWeek + 1);
+      monday.setHours(0, 0, 0, 0);
+
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+
+      const thisWeekLogs = logsData.filter((log: any) => {
+        const logDate = new Date(log.createdAt);
+        return logDate >= monday && logDate <= sunday;
+      });
+
+      setWeeklyLogs(thisWeekLogs.length);
+    } catch (error) {
+      console.error('Erro ao carregar painel do cliente:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
-      const fetchData = async () => {
-        if (!user?.id) return;
-
-        try {
-          setIsLoading(true);
-
-          const workoutsResponse = await fetch(`http://192.168.1.80:3000/api/workouts/${user.id}`);
-          const workoutsData = await workoutsResponse.json();
-          setWorkouts(workoutsData);
-
-          const logsResponse = await fetch(`http://192.168.1.80:3000/api/logs/${user.id}`);
-          const logsData = await logsResponse.json();
-          setTotalLogs(logsData.length || 0);
-
-          const summedMinutes = logsData.reduce((acc: number, log: any) => {
-            return acc + (log.durationMinutes || 0);
-          }, 0);
-          setTotalMinutes(summedMinutes);
-
-          const now = new Date();
-          const dayOfWeek = now.getDay() || 7;
-
-          const monday = new Date(now);
-          monday.setDate(now.getDate() - dayOfWeek + 1);
-          monday.setHours(0, 0, 0, 0);
-
-          const sunday = new Date(monday);
-          sunday.setDate(monday.getDate() + 6);
-          sunday.setHours(23, 59, 59, 999);
-
-          const thisWeekLogs = logsData.filter((log: any) => {
-            const logDate = new Date(log.createdAt);
-            return logDate >= monday && logDate <= sunday;
-          });
-
-          setWeeklyLogs(thisWeekLogs.length);
-        } catch (error) {
-          console.error('Failed to load dashboard:', error);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-
-      fetchData();
-    }, [user?.id])
+      if (isCoach) {
+        fetchCoachData();
+      } else {
+        fetchClientData();
+      }
+    }, [isCoach, user?.id])
   );
 
   const formatTotalTime = (mins: number) => {
@@ -82,17 +127,279 @@ export default function DashboardScreen({ navigation }: any) {
     return m > 0 ? `${h}h ${m}m` : `${h}h`;
   };
 
+  const firstName = user?.name?.split(' ')[0] || 'Treinador';
+  const initial = (user?.name || 'U').charAt(0).toUpperCase();
+
+  // ==========================================
+  // RENDER: VISTA DO PERSONAL TRAINER (COACH)
+  // ==========================================
+  if (isCoach) {
+    const totalWeeklyClientWorkouts = clients.reduce(
+      (sum, c) => sum + (c.weeklyWorkoutsCount || 0),
+      0
+    );
+
+    const atRiskClients = clients.filter(
+      (c) => c.retentionStatus === 'at_risk' || c.retentionStatus === 'warning'
+    );
+
+    const renderClientCard = ({ item }: any) => {
+      const clientInitial = (item.name || 'A').charAt(0).toUpperCase();
+      const isAtRisk = item.retentionStatus === 'at_risk';
+      const isWarning = item.retentionStatus === 'warning';
+
+      return (
+        <TouchableOpacity
+          style={styles.clientCard}
+          onPress={() => navigation.navigate('ClientDetails', { clientId: item.id })}
+          activeOpacity={0.8}
+        >
+          {item.picture ? (
+            <Image source={{ uri: item.picture }} style={styles.clientAvatar} />
+          ) : (
+            <View style={styles.clientAvatarFallback}>
+              <Text style={styles.clientAvatarLetter}>{clientInitial}</Text>
+            </View>
+          )}
+
+          <View style={styles.clientInfo}>
+            <View style={styles.clientNameRow}>
+              <Text style={styles.clientName}>{item.name}</Text>
+              {isAtRisk ? (
+                <View style={styles.riskBadge}>
+                  <Text style={styles.riskBadgeText}>
+                    {item.daysSinceLastWorkout !== null
+                      ? `${t('dashboard.inactiveFor')} ${item.daysSinceLastWorkout}d`
+                      : t('dashboard.noWorkoutsYet')}
+                  </Text>
+                </View>
+              ) : isWarning ? (
+                <View style={styles.warningBadge}>
+                  <Text style={styles.warningBadgeText}>
+                    {`${t('dashboard.inactiveFor')} ${item.daysSinceLastWorkout}d`}
+                  </Text>
+                </View>
+              ) : item.weeklyGoalMet ? (
+                <View style={styles.goalBadge}>
+                  <Text style={styles.goalBadgeText}>{t('dashboard.goalMet')}</Text>
+                </View>
+              ) : null}
+            </View>
+
+            <View style={styles.clientSubRow}>
+              <Text style={styles.clientSubText}>
+                {item.weeklyWorkoutsCount || 0}/{item.weeklyGoal || 3} {t('dashboard.workoutsThisWeek')}
+              </Text>
+              {item.latestWeight ? (
+                <Text style={styles.clientWeightBadge}> · {item.latestWeight} kg</Text>
+              ) : null}
+            </View>
+          </View>
+
+          <View style={styles.clientAction}>
+            <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+          </View>
+        </TouchableOpacity>
+      );
+    };
+
+    return (
+      <Screen>
+        <FlatList
+          data={clients}
+          keyExtractor={(item) => item.id}
+          renderItem={renderClientCard}
+          contentContainerStyle={styles.list}
+          ListHeaderComponent={
+            <View>
+              {/* Header */}
+              <View style={styles.header}>
+                <View>
+                  <View style={styles.roleTag}>
+                    <Text style={styles.roleTagText}>{t('dashboard.roleCoach')}</Text>
+                  </View>
+                  <Text style={styles.hello}>{t('dashboard.hello')}, {firstName}</Text>
+                </View>
+                <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={styles.avatarBtn}>
+                  {user?.picture ? (
+                    <Image source={{ uri: user.picture }} style={styles.avatar} />
+                  ) : (
+                    <View style={styles.avatarFallback}>
+                      <Text style={styles.avatarLetter}>{initial}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {/* Banner de Subscrição / Trial */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setShowPaywallModal(true)}
+              >
+                <Card style={styles.trialCard}>
+                  <View style={styles.trialContent}>
+                    <Ionicons
+                      name={user?.subscriptionStatus === 'active' ? 'checkmark-circle' : 'shield-checkmark-outline'}
+                      size={20}
+                      color={colors.accent}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.trialTitle}>
+                        {user?.subscriptionStatus === 'active'
+                          ? t('dashboard.proSubscriptionActive')
+                          : t('dashboard.proSubscriptionTitle')}
+                      </Text>
+                      <Text style={styles.trialDesc}>
+                        {user?.subscriptionStatus === 'active'
+                          ? t('dashboard.proAccessDesc')
+                          : trial?.daysLeft !== undefined
+                          ? t('dashboard.trialDaysLeftDesc', { days: trial.daysLeft })
+                          : t('dashboard.trialActiveDesc')}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+                  </View>
+                </Card>
+              </TouchableOpacity>
+
+              {/* Alertas de Retenção & Acompanhamento (se houver alunos inativos) */}
+              {atRiskClients.length > 0 && (
+                <Card style={styles.alertsCard}>
+                  <View style={styles.alertsHeader}>
+                    <View style={styles.alertsTitleRow}>
+                      <Ionicons name="alert-circle-outline" size={18} color={colors.danger} />
+                      <Text style={styles.alertsTitle}>{t('dashboard.alertsTitle')}</Text>
+                    </View>
+                    <View style={styles.alertsCountBadge}>
+                      <Text style={styles.alertsCountText}>{atRiskClients.length}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.alertsSubtitle}>
+                    {t('dashboard.alertsSubtitle')}
+                  </Text>
+                  <View style={styles.alertsList}>
+                    {atRiskClients.slice(0, 3).map((client) => (
+                      <TouchableOpacity
+                        key={client.id}
+                        style={styles.alertItem}
+                        onPress={() => navigation.navigate('ClientDetails', { clientId: client.id })}
+                      >
+                        <View style={styles.alertItemInfo}>
+                          <Text style={styles.alertItemName}>{client.name}</Text>
+                          <Text style={styles.alertItemDesc}>
+                            {client.daysSinceLastWorkout !== null
+                              ? t('dashboard.lastWorkoutDays', { days: client.daysSinceLastWorkout })
+                              : t('dashboard.notStartedYet')}
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </Card>
+              )}
+
+              {/* Métricas do PT */}
+              <View style={styles.statsRow}>
+                <Card style={styles.statCard}>
+                  <Text style={styles.statValue}>{clients.length}</Text>
+                  <Text style={styles.statLabel}>{t('dashboard.activeClients')}</Text>
+                </Card>
+                <Card style={styles.statCard}>
+                  <Text style={styles.statValue}>{totalWeeklyClientWorkouts}</Text>
+                  <Text style={styles.statLabel}>{t('dashboard.clientWorkoutsWeek')}</Text>
+                </Card>
+              </View>
+
+              {/* Botões de Ação Rápida */}
+              <View style={styles.actions}>
+                <TouchableOpacity
+                  style={[styles.action, styles.actionPrimary]}
+                  onPress={() => setShowInviteModal(true)}
+                >
+                  <Ionicons name="person-add" size={18} color={colors.bg} />
+                  <Text style={styles.actionPrimaryText}>{t('dashboard.inviteStudent')}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.action}
+                  onPress={() => navigation.navigate('Templates')}
+                >
+                  <Ionicons name="library-outline" size={19} color={colors.accent} />
+                  <Text style={styles.actionText}>{t('dashboard.templates')}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.action}
+                  onPress={() => navigation.navigate('CreateWorkout')}
+                >
+                  <Ionicons name="add" size={20} color={colors.accent} />
+                  <Text style={styles.actionText}>{t('dashboard.createWorkout')}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.action}
+                  onPress={() => navigation.navigate('AIGenerator')}
+                >
+                  <Ionicons name="flash-outline" size={20} color={colors.accent} />
+                  <Text style={styles.actionText}>{t('dashboard.aiGenerator')}</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Título da Lista de Clientes */}
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>{t('dashboard.myStudents')}</Text>
+                <Text style={styles.sectionCount}>({clients.length})</Text>
+              </View>
+
+              {isLoading && <ActivityIndicator color={colors.accent} style={{ marginVertical: 20 }} />}
+            </View>
+          }
+          ListEmptyComponent={
+            isLoading ? null : (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="people-outline" size={44} color={colors.muted} />
+                <Text style={styles.emptyTitle}>{t('dashboard.noStudents')}</Text>
+                <TouchableOpacity
+                  style={styles.inviteButton}
+                  onPress={() => setShowInviteModal(true)}
+                >
+                  <Text style={styles.inviteButtonText}>{t('dashboard.emptyInviteBtn')}</Text>
+                </TouchableOpacity>
+              </View>
+            )
+          }
+        />
+
+        {/* Modal de Convite */}
+        <InviteModal
+          visible={showInviteModal}
+          onClose={() => setShowInviteModal(false)}
+          onClientAdded={fetchCoachData}
+        />
+
+        {/* Modal Paywall / Subscrição Stripe */}
+        <SubscriptionPaywallModal
+          visible={isLocked || showPaywallModal}
+          canDismiss={!isLocked}
+          onDismiss={() => setShowPaywallModal(false)}
+        />
+      </Screen>
+    );
+  }
+
+  // ==========================================
+  // RENDER: VISTA DO ALUNO / CLIENTE
+  // ==========================================
   const remaining = Math.max(WEEKLY_GOAL - weeklyLogs, 0);
-  let weeklyCopy = 'Start your week with a session.';
+  let weeklyCopy = t('dashboard.startWeekCopy');
   if (weeklyLogs > 0 && weeklyLogs < WEEKLY_GOAL) {
-    weeklyCopy = `${remaining} session${remaining === 1 ? '' : 's'} left this week.`;
+    weeklyCopy = t('dashboard.remainingWorkouts', { count: remaining });
   } else if (weeklyLogs >= WEEKLY_GOAL) {
-    weeklyCopy = 'Weekly goal complete.';
+    weeklyCopy = t('dashboard.goalMetCopy');
   }
 
   const progressPercent = Math.min((weeklyLogs / WEEKLY_GOAL) * 100, 100);
-  const firstName = user?.name?.split(' ')[0] || 'there';
-  const initial = (user?.name || 'U').charAt(0).toUpperCase();
 
   const renderWorkoutCard = ({ item }: any) => (
     <TouchableOpacity
@@ -102,7 +409,11 @@ export default function DashboardScreen({ navigation }: any) {
     >
       <View style={styles.workoutText}>
         <Text style={styles.workoutName}>{item.name}</Text>
-        {item.description ? <Text style={styles.workoutDescription} numberOfLines={1}>{item.description}</Text> : null}
+        <Text style={styles.workoutDescription} numberOfLines={1}>
+          {item.assignedBy?.name
+            ? t('dashboard.assignedByCoach', { name: item.assignedBy.name })
+            : item.description || t('dashboard.individualPlan')}
+        </Text>
       </View>
       <Ionicons name="chevron-forward" size={18} color={colors.muted} />
     </TouchableOpacity>
@@ -119,8 +430,8 @@ export default function DashboardScreen({ navigation }: any) {
           <View>
             <View style={styles.header}>
               <View>
-                <Text style={styles.kicker}>Home</Text>
-                <Text style={styles.hello}>Hi, {firstName}</Text>
+                <Text style={styles.kicker}>{t('dashboard.myDashboard')}</Text>
+                <Text style={styles.hello}>{t('dashboard.hello')}, {firstName}</Text>
               </View>
               <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={styles.avatarBtn}>
                 {user?.picture ? (
@@ -133,20 +444,33 @@ export default function DashboardScreen({ navigation }: any) {
               </TouchableOpacity>
             </View>
 
+            {/* Banner de Treinador Associado */}
+            {coach ? (
+              <Card style={styles.coachBanner}>
+                <Ionicons name="shield-checkmark" size={20} color={colors.accent} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.coachBannerTitle}>{t('dashboard.yourCoach')}</Text>
+                  <Text style={styles.coachBannerName}>{coach.name}</Text>
+                </View>
+              </Card>
+            ) : null}
+
+            {/* Cartões de Estatísticas */}
             <View style={styles.statsRow}>
               <Card style={styles.statCard}>
                 <Text style={styles.statValue}>{totalLogs}</Text>
-                <Text style={styles.statLabel}>Workouts</Text>
+                <Text style={styles.statLabel}>{t('dashboard.workoutsCompletedClient')}</Text>
               </Card>
               <Card style={styles.statCard}>
                 <Text style={styles.statValue}>{formatTotalTime(totalMinutes)}</Text>
-                <Text style={styles.statLabel}>Time trained</Text>
+                <Text style={styles.statLabel}>{t('dashboard.trainingTime')}</Text>
               </Card>
             </View>
 
+            {/* Cartão de Progresso Semanal */}
             <Card style={styles.weekCard}>
               <View style={styles.weekHeader}>
-                <Text style={styles.weekTitle}>This week</Text>
+                <Text style={styles.weekTitle}>{t('dashboard.thisWeek')}</Text>
                 <Text style={styles.weekCount}>
                   {weeklyLogs}/{WEEKLY_GOAL}
                 </Text>
@@ -155,37 +479,39 @@ export default function DashboardScreen({ navigation }: any) {
               <View style={styles.weekFooter}>
                 <Text style={styles.weekCopy}>{weeklyCopy}</Text>
                 {(user?.currentStreak || 0) > 0 ? (
-                  <Text style={styles.streak}>{user?.currentStreak} week streak</Text>
+                  <View style={styles.streakBadge}>
+                    <Ionicons name="flame-outline" size={13} color={colors.accent} />
+                    <Text style={styles.streak}>{user?.currentStreak} {t('dashboard.weeksInARow')}</Text>
+                  </View>
                 ) : null}
               </View>
             </Card>
 
+            {/* Ações do Cliente */}
             <View style={styles.actions}>
               <TouchableOpacity style={styles.action} onPress={() => navigation.navigate('Nutrition')}>
                 <Ionicons name="restaurant-outline" size={20} color={colors.accent} />
-                <Text style={styles.actionText}>Nutrition</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.action} onPress={() => navigation.navigate('AIGenerator')}>
-                <Ionicons name="flash-outline" size={20} color={colors.accent} />
-                <Text style={styles.actionText}>AI plan</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.action} onPress={() => navigation.navigate('CreateWorkout')}>
-                <Ionicons name="add" size={20} color={colors.accent} />
-                <Text style={styles.actionText}>New workout</Text>
+                <Text style={styles.actionText}>{t('dashboard.nutritionAndPhotos')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.action} onPress={() => navigation.navigate('History')}>
                 <Ionicons name="time-outline" size={20} color={colors.accent} />
-                <Text style={styles.actionText}>History</Text>
+                <Text style={styles.actionText}>{t('dashboard.history')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.action} onPress={() => navigation.navigate('Profile')}>
+                <Ionicons name="scale-outline" size={20} color={colors.accent} />
+                <Text style={styles.actionText}>{t('dashboard.metricsWeight')}</Text>
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.sectionTitle}>My workouts</Text>
+            <Text style={styles.sectionTitle}>{t('dashboard.assignedWorkouts')}</Text>
             {isLoading ? <ActivityIndicator color={colors.accent} style={{ marginVertical: 20 }} /> : null}
           </View>
         }
         ListEmptyComponent={
           isLoading ? null : (
-            <Text style={styles.empty}>No workouts yet. Create one or generate a plan with AI.</Text>
+            <Text style={styles.empty}>
+              {t('dashboard.noWorkoutsAssigned')}
+            </Text>
           )
         }
       />
@@ -193,7 +519,7 @@ export default function DashboardScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ColorScheme) => StyleSheet.create({
   list: {
     paddingHorizontal: space.lg,
     paddingBottom: 40,
@@ -203,6 +529,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: space.lg,
+  },
+  roleTag: {
+    backgroundColor: colors.surface2,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+    marginBottom: 4,
+  },
+  roleTagText: {
+    color: colors.accent,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   kicker: {
     color: colors.muted,
@@ -216,12 +557,11 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     letterSpacing: -0.6,
-    marginTop: 2,
   },
   avatarBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: colors.border,
@@ -233,18 +573,62 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarLetter: { color: colors.text, fontWeight: '700', fontSize: 16 },
+  avatarLetter: { color: colors.text, fontWeight: '700', fontSize: 18 },
+
+  trialCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.accent,
+    borderWidth: 1,
+    marginBottom: 14,
+    padding: 14,
+  },
+  trialContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  trialTitle: {
+    color: colors.accent,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  trialDesc: {
+    color: colors.muted,
+    fontSize: 12,
+    marginTop: 2,
+  },
+
+  coachBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+    borderColor: colors.accent,
+  },
+  coachBannerTitle: {
+    color: colors.muted,
+    fontSize: 12,
+  },
+  coachBannerName: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
-  statCard: { flex: 1 },
-  statValue: { color: colors.text, fontSize: 26, fontWeight: '700', letterSpacing: -0.5 },
-  statLabel: { color: colors.muted, fontSize: 13, marginTop: 4 },
-  weekCard: { marginBottom: space.lg },
+  statCard: { flex: 1, padding: 14 },
+  statValue: { color: colors.text, fontSize: 24, fontWeight: '700', letterSpacing: -0.5 },
+  statLabel: { color: colors.muted, fontSize: 12, marginTop: 4 },
+
+  weekCard: { marginBottom: space.lg, padding: 16 },
   weekHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  weekTitle: { color: colors.text, fontSize: 16, fontWeight: '600' },
-  weekCount: { color: colors.accent, fontSize: 16, fontWeight: '700' },
+  weekTitle: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  weekCount: { color: colors.accent, fontSize: 15, fontWeight: '700' },
   weekFooter: { marginTop: 12, flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
   weekCopy: { color: colors.muted, fontSize: 13, flex: 1 },
-  streak: { color: colors.text, fontSize: 13, fontWeight: '600' },
+  streakBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  streak: { color: colors.accent, fontSize: 13, fontWeight: '700' },
+
   actions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -252,25 +636,205 @@ const styles = StyleSheet.create({
     marginBottom: space.lg,
   },
   action: {
-    width: '47%',
-    flexGrow: 1,
+    flex: 1,
+    minWidth: '45%',
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
-    paddingVertical: 16,
-    paddingHorizontal: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
+    justifyContent: 'center',
   },
-  actionText: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  actionPrimary: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  actionPrimaryText: {
+    color: colors.bg,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  actionText: { color: colors.text, fontSize: 14, fontWeight: '600' },
+
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
+  },
   sectionTitle: {
     color: colors.text,
     fontSize: 18,
     fontWeight: '700',
-    marginBottom: 12,
   },
+  sectionCount: {
+    color: colors.muted,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+
+  alertsCard: {
+    marginBottom: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.danger,
+    padding: 14,
+  },
+  alertsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  alertsTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  alertsTitle: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  alertsCountBadge: {
+    backgroundColor: colors.dangerDim,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+  },
+  alertsCountText: {
+    color: colors.danger,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  alertsSubtitle: {
+    color: colors.muted,
+    fontSize: 12,
+    marginBottom: 10,
+  },
+  alertsList: {
+    gap: 8,
+  },
+  alertItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface2,
+    padding: 10,
+    borderRadius: radius.sm,
+  },
+  alertItemInfo: {
+    flex: 1,
+    marginRight: 8,
+  },
+  alertItemName: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  alertItemDesc: {
+    color: colors.muted,
+    fontSize: 12,
+    marginTop: 2,
+  },
+
+  clientCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  clientAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  clientAvatarFallback: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.surface2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clientAvatarLetter: {
+    color: colors.accent,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  clientInfo: {
+    flex: 1,
+  },
+  clientNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  clientName: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  riskBadge: {
+    backgroundColor: colors.dangerDim,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+  },
+  riskBadgeText: {
+    color: colors.danger,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  warningBadge: {
+    backgroundColor: 'rgba(235, 179, 58, 0.14)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+  },
+  warningBadgeText: {
+    color: '#EBB33A',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  goalBadge: {
+    backgroundColor: colors.accentDim,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+  },
+  goalBadgeText: {
+    color: colors.accent,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  clientSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 3,
+  },
+  clientSubText: {
+    color: colors.muted,
+    fontSize: 13,
+  },
+  clientWeightBadge: {
+    color: colors.accent,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  clientAction: {
+    padding: 4,
+  },
+
   workoutCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
@@ -284,5 +848,37 @@ const styles = StyleSheet.create({
   workoutText: { flex: 1, marginRight: 8 },
   workoutName: { color: colors.text, fontSize: 16, fontWeight: '600' },
   workoutDescription: { color: colors.muted, fontSize: 13, marginTop: 4 },
-  empty: { color: colors.muted, fontSize: 15, lineHeight: 22, textAlign: 'center', marginTop: 12 },
+
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    gap: 10,
+  },
+  emptyTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  empty: {
+    color: colors.muted,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    maxWidth: 280,
+  },
+  inviteButton: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: radius.md,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  inviteButtonText: {
+    color: colors.accent,
+    fontSize: 14,
+    fontWeight: '700',
+  },
 });

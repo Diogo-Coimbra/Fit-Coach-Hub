@@ -1,79 +1,172 @@
-import React, { useState } from 'react';
-import { StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { StyleSheet, View, Alert, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity, Text } from 'react-native';
 import { useAuthStore } from '../store/useAuthStore';
 import { BackButton, Button, Field, Screen, Subtitle, Title } from '../components/ui';
-import { space } from '../theme';
+import { ColorScheme, radius, space } from '../theme';
+import { api } from '../services/api';
+import { useTheme } from '../store/useThemeStore';
+import { useLanguage } from '../store/useLanguageStore';
 
-export default function CreateWorkoutScreen({ navigation }: any) {
+export default function CreateWorkoutScreen({ route, navigation }: any) {
   const { user } = useAuthStore();
+  const { colors, mode } = useTheme();
+  const { t } = useLanguage();
+  const styles = useMemo(() => getStyles(colors), [colors]);
+  const targetClientId = route?.params?.targetClientId;
+  const isTemplate = route?.params?.isTemplate || false;
+
+  const categories = useMemo(() => [
+    { id: 'Hipertrofia', label: t('workouts.catHypertrophy') },
+    { id: 'Força', label: t('workouts.catStrength') },
+    { id: 'Perda de Gordura', label: t('workouts.catFatLoss') },
+    { id: 'Full Body', label: t('workouts.catFullBody') },
+    { id: 'Condicionamento', label: t('workouts.catConditioning') },
+  ], [t]);
+
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('Hipertrofia');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleCreateWorkout = async () => {
     if (!name.trim()) {
-      Alert.alert('Name required', 'Please enter a workout name.');
+      Alert.alert(t('common.attention'), t('workouts.nameRequiredAlert'));
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('http://192.168.1.80:3000/api/workouts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          description,
-          userId: user?.id,
-        }),
-      });
-
-      if (response.ok) {
-        navigation.goBack();
+      if (isTemplate) {
+        const newTemplate = await api.post('/api/coach/templates', {
+          name: name.trim(),
+          description: description.trim() || undefined,
+          category,
+        });
+        navigation.replace('WorkoutDetails', { workoutId: newTemplate.id });
       } else {
-        Alert.alert('Error', 'Could not save this workout.');
+        const newWorkout = await api.post('/api/workouts', {
+          name: name.trim(),
+          description: description.trim() || undefined,
+          targetClientId: targetClientId || undefined,
+        });
+        navigation.replace('WorkoutDetails', { workoutId: newWorkout.id });
       }
-    } catch (error) {
-      console.error('Failed to create workout:', error);
-      Alert.alert('Error', 'Could not reach the server.');
+    } catch (error: any) {
+      console.error('Falha ao criar treino:', error);
+      Alert.alert(t('common.error'), error.message || t('common.error'));
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const pageTitle = isTemplate
+    ? t('workouts.createTemplateTitle')
+    : targetClientId
+    ? t('clientDetails.assignWorkout')
+    : t('workouts.createWorkoutTitle');
+
+  const pageSubtitle = isTemplate
+    ? t('workouts.createTemplateSubtitle')
+    : targetClientId
+    ? t('workouts.assignWorkoutSubtitle')
+    : t('workouts.createWorkoutSubtitle');
 
   return (
     <Screen>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content}>
           <BackButton onPress={() => navigation.goBack()} />
-          <Title>New workout</Title>
-          <Subtitle>Give it a name. You can add exercises next.</Subtitle>
+          <Title>{pageTitle}</Title>
+          <Subtitle>{pageSubtitle}</Subtitle>
 
           <Field
-            label="Name"
-            placeholder="Push day, legs, full body..."
+            label={t('workouts.workoutNameLabel')}
+            placeholder={t('workouts.workoutNamePlaceholder')}
             value={name}
             onChangeText={setName}
           />
+
+          {isTemplate && (
+            <View style={styles.categorySection}>
+              <Text style={styles.categoryLabel}>{t('workouts.categoryLabel')}</Text>
+              <View style={styles.chipsRow}>
+                {categories.map((cat) => {
+                  const isSelected = category === cat.id;
+                  return (
+                    <TouchableOpacity
+                      key={cat.id}
+                      style={[styles.chip, isSelected && styles.chipActive]}
+                      onPress={() => setCategory(cat.id)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
+                        {cat.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
           <Field
-            label="Description (optional)"
-            placeholder="Focus, duration, notes..."
+            label={t('workouts.descriptionLabel')}
+            placeholder={t('workouts.descriptionPlaceholder')}
             value={description}
             onChangeText={setDescription}
             multiline
             numberOfLines={4}
-            style={{ minHeight: 100, textAlignVertical: 'top' }}
+            style={{ minHeight: 90, textAlignVertical: 'top' }}
           />
 
-          <Button title="Save workout" onPress={handleCreateWorkout} loading={isSubmitting} />
-          <Button title="Cancel" variant="ghost" onPress={() => navigation.goBack()} />
+          <Button
+            title={isTemplate ? t('workouts.createTemplateAndAddExercises') : t('workouts.saveAndAddExercises')}
+            onPress={handleCreateWorkout}
+            loading={isSubmitting}
+          />
+          <Button title={t('common.cancel')} variant="ghost" onPress={() => navigation.goBack()} />
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ColorScheme) => StyleSheet.create({
   content: { paddingHorizontal: space.lg, paddingBottom: 40, paddingTop: 4 },
+  categorySection: {
+    marginBottom: 16,
+  },
+  categoryLabel: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    backgroundColor: colors.surface2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: radius.sm,
+  },
+  chipActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  chipText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  chipTextActive: {
+    color: colors.bg,
+    fontWeight: '700',
+  },
 });

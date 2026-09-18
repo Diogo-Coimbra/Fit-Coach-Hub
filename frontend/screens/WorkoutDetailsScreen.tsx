@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -8,24 +8,61 @@ import {
   Alert,
   Platform,
   ActivityIndicator,
+  TextInput,
+  KeyboardAvoidingView,
+  Vibration,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/useAuthStore';
 import { BackButton, Button, Card, Screen, showAlert, Title } from '../components/ui';
-import { colors, radius, space } from '../theme';
+import { ColorScheme, radius, space } from '../theme';
+import { api } from '../services/api';
+import { useTheme } from '../store/useThemeStore';
+import { useLanguage } from '../store/useLanguageStore';
+
+export type SetType = 'NORMAL' | 'WARMUP' | 'DROPSET' | 'FAILURE';
+
+interface ExerciseSetLogState {
+  setNumber: number;
+  reps: string;
+  weight: string;
+  completed: boolean;
+  setType: SetType;
+}
+
+interface PreviousSetData {
+  setNumber: number;
+  weight: number | null;
+  reps: number;
+  setType: string;
+}
+
+interface PreviousPerformanceData {
+  date: string;
+  sets: PreviousSetData[];
+}
 
 export default function WorkoutDetailsScreen({ route, navigation }: any) {
   const { workoutId } = route.params;
   const { user } = useAuthStore();
+  const { colors } = useTheme();
+  const { t } = useLanguage();
+  const styles = useMemo(() => getStyles(colors), [colors]);
 
   const [workoutDetails, setWorkoutDetails] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [completedExercises, setCompletedExercises] = useState<string[]>([]);
   const [isFinishing, setIsFinishing] = useState(false);
   const [isCloning, setIsCloning] = useState(false);
   const [startTime] = useState<Date>(new Date());
   const [exercisePRs, setExercisePRs] = useState<Record<string, number>>({});
+  const [previousPerformance, setPreviousPerformance] = useState<Record<string, PreviousPerformanceData>>({});
+  
+  // Estrutura de séries executadas por exercício: { [exerciseId]: ExerciseSetLogState[] }
+  const [exerciseSets, setExerciseSets] = useState<Record<string, ExerciseSetLogState[]>>({});
+  const [workoutNotes, setWorkoutNotes] = useState('');
+
+  // Temporizador de descanso
   const [timeLeft, setTimeLeft] = useState(0);
   const [timerState, setTimerState] = useState<'idle' | 'running' | 'finished'>('idle');
 
@@ -35,6 +72,14 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
       interval = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
     } else if (timerState === 'running' && timeLeft === 0) {
       setTimerState('finished');
+      // Vibração tátil ao terminar o descanso
+      if (Platform.OS !== 'web') {
+        try {
+          Vibration.vibrate([0, 500, 200, 500]);
+        } catch (vErr) {
+          console.warn('Vibração não suportada:', vErr);
+        }
+      }
     }
     return () => clearInterval(interval);
   }, [timerState, timeLeft]);
@@ -59,35 +104,85 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
     if (!user?.id || !exercises || exercises.length === 0) return;
 
     const prData: Record<string, number> = {};
-
     await Promise.all(
       exercises.map(async (ex) => {
         try {
-          const response = await fetch(
-            `http://192.168.1.80:3000/api/exercises/${user.id}/pr/${encodeURIComponent(ex.name)}`
-          );
-          if (response.ok) {
-            const data = await response.json();
-            if (data.pr > 0) prData[ex.name] = data.pr;
-          }
+          const data = await api.get(`/api/exercises/${user.id}/pr/${encodeURIComponent(ex.name)}`);
+          if (data && data.pr > 0) prData[ex.name] = data.pr;
         } catch (error) {
-          console.error(`Failed to load PR for ${ex.name}:`, error);
+          console.error(`Falha ao obter recorde de ${ex.name}:`, error);
         }
       })
     );
-
     setExercisePRs(prData);
+  };
+
+  const fetchPreviousPerformance = async (exercises: any[]) => {
+    if (!user?.id || !exercises || exercises.length === 0) return;
+    try {
+      const exerciseNames = exercises.map((e) => e.name);
+      const perfData = await api.post('/api/exercises/previous-performance', { exerciseNames });
+      if (perfData && typeof perfData === 'object') {
+        setPreviousPerformance(perfData);
+      }
+    } catch (error) {
+      console.error('Falha ao obter desempenho anterior:', error);
+    }
+  };
+
+  const initExerciseSets = (exercises: any[], prevData?: Record<string, PreviousPerformanceData>) => {
+    setExerciseSets((prev) => {
+      const updated = { ...prev };
+      exercises.forEach((ex) => {
+        if (!updated[ex.id]) {
+          const totalSets = Math.max(1, ex.sets || 3);
+          const defaultReps = String(ex.reps || 10);
+          const defaultWeight = ex.weight !== null && ex.weight !== undefined ? String(ex.weight) : '';
+          
+          const pastSets = prevData?.[ex.name]?.sets || [];
+
+          updated[ex.id] = Array.from({ length: totalSets }, (_, idx) => {
+            const past = pastSets[idx];
+            return {
+              setNumber: idx + 1,
+              reps: past?.reps ? String(past.reps) : defaultReps,
+              weight: past?.weight !== null && past?.weight !== undefined ? String(past.weight) : defaultWeight,
+              completed: false,
+              setType: (past?.setType as SetType) || 'NORMAL',
+            };
+          });
+        }
+      });
+      return updated;
+    });
   };
 
   const fetchDetails = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`http://192.168.1.80:3000/api/workouts/detail/${workoutId}`);
-      const data = await response.json();
+      const data = await api.get(`/api/workouts/detail/${workoutId}`);
       setWorkoutDetails(data);
-      if (data?.exercises) await fetchPRs(data.exercises);
+
+      if (data?.exercises && data.exercises.length > 0) {
+        // Obter PRs e desempenho anterior em paralelo
+        const exerciseNames = data.exercises.map((e: any) => e.name);
+        let pastPerfMap: Record<string, PreviousPerformanceData> = {};
+        
+        try {
+          const pastData = await api.post('/api/exercises/previous-performance', { exerciseNames });
+          if (pastData) {
+            pastPerfMap = pastData;
+            setPreviousPerformance(pastData);
+          }
+        } catch (pErr) {
+          console.warn('Histórico prévio indisponível:', pErr);
+        }
+
+        initExerciseSets(data.exercises, pastPerfMap);
+        await fetchPRs(data.exercises);
+      }
     } catch (error) {
-      console.error('Failed to load workout:', error);
+      console.error('Falha ao carregar treino:', error);
     } finally {
       setIsLoading(false);
     }
@@ -99,58 +194,136 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
     }, [workoutId])
   );
 
-  const executeDeleteExercise = async (exerciseId: string) => {
-    try {
-      const response = await fetch(`http://192.168.1.80:3000/api/exercises/${exerciseId}`, { method: 'DELETE' });
-      if (response.ok) {
-        setWorkoutDetails((prev: any) => ({
-          ...prev,
-          exercises: prev.exercises.filter((ex: any) => ex.id !== exerciseId),
-        }));
-      } else {
-        showAlert('Error', 'Could not delete this exercise.');
+  const toggleSetCompletion = (exerciseId: string, setIndex: number, restSeconds?: number) => {
+    setExerciseSets((prev) => {
+      const list = prev[exerciseId] ? [...prev[exerciseId]] : [];
+      if (!list[setIndex]) return prev;
+
+      const willComplete = !list[setIndex].completed;
+      list[setIndex] = {
+        ...list[setIndex],
+        completed: willComplete,
+      };
+
+      // Dispara o descanso recomendado se a série for marcada como concluída
+      if (willComplete) {
+        startTimer(restSeconds || 90);
       }
-    } catch (error) {
-      console.error('Failed to delete exercise:', error);
-    }
+
+      return {
+        ...prev,
+        [exerciseId]: list,
+      };
+    });
   };
 
-  const executeDeleteWorkout = async () => {
-    try {
-      const response = await fetch(`http://192.168.1.80:3000/api/workouts/${workoutId}`, { method: 'DELETE' });
-      if (response.ok) navigation.navigate('Dashboard');
-      else showAlert('Error', 'Could not delete this workout.');
-    } catch (error) {
-      console.error('Failed to delete workout:', error);
-    }
+  const updateSetValue = (
+    exerciseId: string,
+    setIndex: number,
+    field: 'weight' | 'reps',
+    val: string
+  ) => {
+    setExerciseSets((prev) => {
+      const list = prev[exerciseId] ? [...prev[exerciseId]] : [];
+      if (!list[setIndex]) return prev;
+
+      list[setIndex] = {
+        ...list[setIndex],
+        [field]: val,
+      };
+
+      return {
+        ...prev,
+        [exerciseId]: list,
+      };
+    });
   };
 
-  const handleDeleteExercise = (exerciseId: string, exerciseName: string) => {
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Remove "${exerciseName}"?`)) executeDeleteExercise(exerciseId);
-    } else {
-      Alert.alert('Remove exercise', `Remove "${exerciseName}" from this workout?`, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Remove', style: 'destructive', onPress: () => executeDeleteExercise(exerciseId) },
-      ]);
-    }
+  // Ciclar entre Tipos de Série: NORMAL -> WARMUP (W) -> DROPSET (D) -> FAILURE (F) -> NORMAL
+  const cycleSetType = (exerciseId: string, setIndex: number) => {
+    setExerciseSets((prev) => {
+      const list = prev[exerciseId] ? [...prev[exerciseId]] : [];
+      if (!list[setIndex]) return prev;
+
+      const types: SetType[] = ['NORMAL', 'WARMUP', 'DROPSET', 'FAILURE'];
+      const currentIdx = types.indexOf(list[setIndex].setType || 'NORMAL');
+      const nextType = types[(currentIdx + 1) % types.length];
+
+      list[setIndex] = {
+        ...list[setIndex],
+        setType: nextType,
+      };
+
+      return {
+        ...prev,
+        [exerciseId]: list,
+      };
+    });
   };
 
-  const handleDeleteWorkout = () => {
-    if (Platform.OS === 'web') {
-      if (window.confirm('Delete this workout and all of its exercises?')) executeDeleteWorkout();
-    } else {
-      Alert.alert('Delete workout', 'This will remove the workout and all of its exercises.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: executeDeleteWorkout },
-      ]);
-    }
+  // Ajuste rápido de Peso com Stepper (+/-)
+  const adjustWeight = (exerciseId: string, setIndex: number, delta: number) => {
+    setExerciseSets((prev) => {
+      const list = prev[exerciseId] ? [...prev[exerciseId]] : [];
+      if (!list[setIndex]) return prev;
+
+      const currentVal = parseFloat(list[setIndex].weight.replace(',', '.')) || 0;
+      const newVal = Math.max(0, Math.round((currentVal + delta) * 10) / 10);
+
+      list[setIndex] = {
+        ...list[setIndex],
+        weight: newVal === 0 ? '' : String(newVal),
+      };
+
+      return { ...prev, [exerciseId]: list };
+    });
   };
 
-  const toggleExerciseCompletion = (exerciseId: string) => {
-    setCompletedExercises((prev) =>
-      prev.includes(exerciseId) ? prev.filter((id) => id !== exerciseId) : [...prev, exerciseId]
-    );
+  // Ajuste rápido de Repetições com Stepper (+/-)
+  const adjustReps = (exerciseId: string, setIndex: number, delta: number) => {
+    setExerciseSets((prev) => {
+      const list = prev[exerciseId] ? [...prev[exerciseId]] : [];
+      if (!list[setIndex]) return prev;
+
+      const currentVal = parseInt(list[setIndex].reps, 10) || 0;
+      const newVal = Math.max(0, currentVal + delta);
+
+      list[setIndex] = {
+        ...list[setIndex],
+        reps: String(newVal),
+      };
+
+      return { ...prev, [exerciseId]: list };
+    });
+  };
+
+  // Adicionar série extra no exercício
+  const addSetToExercise = (exerciseId: string, defaultWeight?: number, defaultReps?: number) => {
+    setExerciseSets((prev) => {
+      const list = prev[exerciseId] ? [...prev[exerciseId]] : [];
+      const nextNum = list.length + 1;
+      const lastSet = list[list.length - 1];
+
+      list.push({
+        setNumber: nextNum,
+        weight: lastSet ? lastSet.weight : (defaultWeight ? String(defaultWeight) : ''),
+        reps: lastSet ? lastSet.reps : String(defaultReps || 10),
+        completed: false,
+        setType: 'NORMAL',
+      });
+
+      return { ...prev, [exerciseId]: list };
+    });
+  };
+
+  // Remover última série do exercício
+  const removeLastSetFromExercise = (exerciseId: string) => {
+    setExerciseSets((prev) => {
+      const list = prev[exerciseId] ? [...prev[exerciseId]] : [];
+      if (list.length <= 1) return prev;
+      list.pop();
+      return { ...prev, [exerciseId]: list };
+    });
   };
 
   const handleFinishWorkout = async () => {
@@ -162,21 +335,35 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
       const diffMs = endTime.getTime() - startTime.getTime();
       const durationMinutes = Math.max(1, Math.floor(diffMs / 60000));
 
-      const response = await fetch('http://192.168.1.80:3000/api/logs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, workoutId: workoutDetails.id, durationMinutes }),
+      // Mapear todas as séries para envio ao backend incluindo setType
+      const flatSets: any[] = [];
+      (workoutDetails.exercises || []).forEach((ex: any) => {
+        const sets = exerciseSets[ex.id] || [];
+        sets.forEach((s) => {
+          flatSets.push({
+            exerciseId: ex.id,
+            exerciseName: ex.name,
+            setNumber: s.setNumber,
+            reps: Number(s.reps) || 0,
+            weight: s.weight ? Number(s.weight.replace(',', '.')) : 0,
+            completed: s.completed,
+            setType: s.setType || 'NORMAL',
+          });
+        });
       });
 
-      if (response.ok) {
-        showAlert('Session logged', `${durationMinutes} min recorded.`);
-        navigation.navigate('Dashboard');
-      } else {
-        throw new Error('Failed to log workout');
-      }
-    } catch (error) {
-      console.error('Failed to finish workout:', error);
-      showAlert('Error', 'Could not log this session.');
+      await api.post('/api/logs', {
+        workoutId: workoutDetails.id,
+        durationMinutes,
+        notes: workoutNotes.trim() || undefined,
+        sets: flatSets,
+      });
+
+      showAlert(t('workouts.workoutFinishedTitle'), t('workouts.workoutFinishedMsg', { duration: durationMinutes }));
+      navigation.navigate('Dashboard');
+    } catch (error: any) {
+      console.error('Falha ao concluir treino:', error);
+      showAlert(t('common.error'), error.message || t('common.error'));
     } finally {
       setIsFinishing(false);
     }
@@ -185,194 +372,700 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
   const handleCloneWorkout = async () => {
     setIsCloning(true);
     try {
-      const response = await fetch(`http://192.168.1.80:3000/api/workouts/${workoutId}/clone`, { method: 'POST' });
-      if (response.ok) {
-        const clonedWorkout = await response.json();
-        navigation.replace('WorkoutDetails', { workoutId: clonedWorkout.id });
-      } else {
-        throw new Error('Clone failed');
-      }
-    } catch (error) {
-      console.error('Failed to duplicate workout:', error);
-      showAlert('Error', 'Could not duplicate this workout.');
+      const cloned = await api.post(`/api/workouts/${workoutId}/clone`);
+      navigation.replace('WorkoutDetails', { workoutId: cloned.id });
+    } catch (error: any) {
+      console.error('Falha ao duplicar plano:', error);
+      showAlert(t('common.error'), error.message || t('common.error'));
     } finally {
       setIsCloning(false);
     }
   };
 
-  const renderExercise = ({ item }: any) => {
-    const isCompleted = completedExercises.includes(item.id);
+  const executeDeleteExercise = async (exerciseId: string) => {
+    try {
+      await api.delete(`/api/exercises/${exerciseId}`);
+      setWorkoutDetails((prev: any) => ({
+        ...prev,
+        exercises: prev.exercises.filter((ex: any) => ex.id !== exerciseId),
+      }));
+    } catch (error: any) {
+      console.error('Falha ao remover exercício:', error);
+      showAlert(t('common.error'), error.message || t('common.error'));
+    }
+  };
+
+  const executeDeleteWorkout = async () => {
+    try {
+      await api.delete(`/api/workouts/${workoutId}`);
+      navigation.navigate('Dashboard');
+    } catch (error: any) {
+      console.error('Falha ao apagar plano:', error);
+      showAlert(t('common.error'), error.message || t('common.error'));
+    }
+  };
+
+  const handleDeleteExercise = (exerciseId: string, exerciseName: string) => {
+    if (Platform.OS === 'web') {
+      if (window.confirm(t('workouts.deleteExerciseConfirm', { name: exerciseName }))) executeDeleteExercise(exerciseId);
+    } else {
+      Alert.alert(t('workouts.removeExerciseTitle'), t('workouts.deleteExerciseConfirm', { name: exerciseName }), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.remove'), style: 'destructive', onPress: () => executeDeleteExercise(exerciseId) },
+      ]);
+    }
+  };
+
+  const handleDeleteWorkout = () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm(t('workouts.deleteWorkoutConfirm'))) executeDeleteWorkout();
+    } else {
+      Alert.alert(t('workouts.deleteWorkout'), t('workouts.deleteWorkoutConfirm'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.delete'), style: 'destructive', onPress: executeDeleteWorkout },
+      ]);
+    }
+  };
+
+  // Renderizar o badge estilizado de Tipo de Série (1, W, D, F)
+  const renderSetTypeBadge = (setType: SetType, setNumber: number) => {
+    let badgeStyle = styles.setBadgeNormal;
+    let label = String(setNumber);
+
+    if (setType === 'WARMUP') {
+      badgeStyle = styles.setBadgeWarmup;
+      label = 'W';
+    } else if (setType === 'DROPSET') {
+      badgeStyle = styles.setBadgeDropset;
+      label = 'D';
+    } else if (setType === 'FAILURE') {
+      badgeStyle = styles.setBadgeFailure;
+      label = 'F';
+    }
 
     return (
-      <TouchableOpacity
-        activeOpacity={0.8}
-        style={[styles.exerciseCard, isCompleted && styles.exerciseDone]}
-        onPress={() => toggleExerciseCompletion(item.id)}
-      >
-        <View style={[styles.check, isCompleted && styles.checkOn]}>
-          {isCompleted ? <Ionicons name="checkmark" size={14} color={colors.bg} /> : null}
-        </View>
-        <View style={styles.exerciseInfo}>
-          <View style={styles.nameRow}>
-            <Text style={[styles.exerciseName, isCompleted && styles.doneText]}>{item.name}</Text>
-            {exercisePRs[item.name] ? (
+      <View style={[styles.setBadge, badgeStyle]}>
+        <Text style={styles.setBadgeText}>{label}</Text>
+      </View>
+    );
+  };
+
+  const renderExercise = ({ item }: any) => {
+    const sets = exerciseSets[item.id] || [];
+    const pr = exercisePRs[item.name];
+    const pastPerf = previousPerformance[item.name];
+
+    return (
+      <Card style={styles.exerciseBlock}>
+        <View style={styles.exerciseHeader}>
+          <View style={styles.headerInfo}>
+            <Text style={styles.exerciseTitle}>{item.name}</Text>
+            {pr ? (
               <View style={styles.prBadge}>
-                <Text style={styles.prText}>PR {exercisePRs[item.name]} kg</Text>
+                <Ionicons name="trophy-outline" size={12} color={colors.accent} style={{ marginRight: 3 }} />
+                <Text style={styles.prBadgeText}>{t('workouts.record')}: {pr} kg</Text>
               </View>
             ) : null}
           </View>
-          <Text style={[styles.exerciseDetails, isCompleted && styles.doneText]}>
-            {item.sets} sets × {item.reps} reps{item.weight ? ` · ${item.weight} kg` : ''}
-          </Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={() => navigation.navigate('EditExercise', { exercise: item })}
+            >
+              <Ionicons name="pencil-outline" size={17} color={colors.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={() => handleDeleteExercise(item.id, item.name)}
+            >
+              <Ionicons name="trash-outline" size={17} color={colors.danger} />
+            </TouchableOpacity>
+          </View>
         </View>
-        <View style={styles.actions}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('EditExercise', { exercise: item })}>
-            <Ionicons name="pencil-outline" size={18} color={colors.muted} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => handleDeleteExercise(item.id, item.name)}>
-            <Ionicons name="trash-outline" size={18} color={colors.danger} />
-          </TouchableOpacity>
+
+        {item.notes ? (
+          <Text style={styles.exerciseNotes}>{item.notes}</Text>
+        ) : null}
+
+        {/* Cabeçalho da Tabela com Desempenho Anterior */}
+        <View style={styles.tableHeader}>
+          <Text style={[styles.colHeader, { width: 38, textAlign: 'center' }]}>{t('workouts.set')}</Text>
+          <Text style={[styles.colHeader, { width: 66, textAlign: 'center' }]}>{t('workouts.previous')}</Text>
+          <Text style={[styles.colHeader, { flex: 1.1, textAlign: 'center' }]}>{t('workouts.weight')} (kg)</Text>
+          <Text style={[styles.colHeader, { flex: 1, textAlign: 'center' }]}>{t('workouts.reps')}</Text>
+          <Text style={[styles.colHeader, { width: 38, textAlign: 'center' }]}>{t('common.status')}</Text>
         </View>
-      </TouchableOpacity>
+
+        {/* Linhas de Séries Interativas */}
+        {sets.map((s, idx) => {
+          const pastSet = pastPerf?.sets?.[idx];
+          const pastSetDisplay = pastSet
+            ? `${pastSet.weight ?? 0}kg × ${pastSet.reps}`
+            : '-';
+
+          return (
+            <View key={`set-${item.id}-${idx}`} style={[styles.setRow, s.completed && styles.setRowCompleted]}>
+              {/* Botão Cíclico de Tipo de Série (1, W, D, F) */}
+              <TouchableOpacity
+                style={styles.setTypeBtn}
+                onPress={() => cycleSetType(item.id, idx)}
+              >
+                {renderSetTypeBadge(s.setType, s.setNumber)}
+              </TouchableOpacity>
+
+              {/* Registo Anterior */}
+              <View style={styles.previousCell}>
+                <Text style={styles.previousText} numberOfLines={1}>
+                  {pastSetDisplay}
+                </Text>
+              </View>
+
+              {/* Stepper e Input de Carga (kg) */}
+              <View style={styles.stepperContainer}>
+                <TouchableOpacity
+                  style={styles.stepperBtn}
+                  onPress={() => adjustWeight(item.id, idx, -2.5)}
+                >
+                  <Text style={styles.stepperBtnText}>-</Text>
+                </TouchableOpacity>
+
+                <TextInput
+                  style={styles.stepperInput}
+                  keyboardType="numeric"
+                  value={s.weight}
+                  placeholder={String(pastSet?.weight ?? item.weight ?? 0)}
+                  placeholderTextColor={colors.muted}
+                  onChangeText={(val) => updateSetValue(item.id, idx, 'weight', val)}
+                />
+
+                <TouchableOpacity
+                  style={styles.stepperBtn}
+                  onPress={() => adjustWeight(item.id, idx, 2.5)}
+                >
+                  <Text style={styles.stepperBtnText}>+</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Stepper e Input de Repetições */}
+              <View style={styles.stepperContainer}>
+                <TouchableOpacity
+                  style={styles.stepperBtn}
+                  onPress={() => adjustReps(item.id, idx, -1)}
+                >
+                  <Text style={styles.stepperBtnText}>-</Text>
+                </TouchableOpacity>
+
+                <TextInput
+                  style={styles.stepperInput}
+                  keyboardType="numeric"
+                  value={s.reps}
+                  placeholder={String(pastSet?.reps ?? item.reps ?? 10)}
+                  placeholderTextColor={colors.muted}
+                  onChangeText={(val) => updateSetValue(item.id, idx, 'reps', val)}
+                />
+
+                <TouchableOpacity
+                  style={styles.stepperBtn}
+                  onPress={() => adjustReps(item.id, idx, 1)}
+                >
+                  <Text style={styles.stepperBtnText}>+</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Botão de Conclusão da Série */}
+              <TouchableOpacity
+                style={[styles.checkBtn, s.completed && styles.checkBtnActive]}
+                onPress={() => toggleSetCompletion(item.id, idx, item.restSeconds)}
+              >
+                <Ionicons
+                  name="checkmark"
+                  size={16}
+                  color={s.completed ? colors.bg : colors.muted}
+                />
+              </TouchableOpacity>
+            </View>
+          );
+        })}
+
+        {/* Ações Rápidas: Adicionar Série Extra ou Remover Última Série */}
+        <View style={styles.setActionsRow}>
+          <TouchableOpacity
+            style={styles.addSetInlineBtn}
+            onPress={() => addSetToExercise(item.id, item.weight, item.reps)}
+          >
+            <Ionicons name="add" size={14} color={colors.accent} />
+            <Text style={styles.addSetInlineText}>+ {t('workouts.set')}</Text>
+          </TouchableOpacity>
+
+          {sets.length > 1 && (
+            <TouchableOpacity
+              style={styles.removeSetInlineBtn}
+              onPress={() => removeLastSetFromExercise(item.id)}
+            >
+              <Ionicons name="trash-outline" size={13} color={colors.danger} />
+              <Text style={styles.removeSetInlineText}>{t('common.remove')}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </Card>
     );
   };
 
   return (
     <Screen>
-      <View style={styles.pad}>
-        <BackButton onPress={() => navigation.goBack()} label="Home" />
-        {isLoading && !workoutDetails ? (
-          <ActivityIndicator color={colors.accent} />
-        ) : (
-          <>
-            <Title>{workoutDetails?.name}</Title>
-            {workoutDetails?.description ? (
-              <Text style={styles.description}>{workoutDetails.description}</Text>
-            ) : null}
-          </>
-        )}
-
-        <Card style={[styles.timer, timerState === 'finished' && styles.timerDone]}>
-          <Text style={styles.timerLabel}>Rest timer</Text>
-          {timerState === 'finished' ? (
-            <View>
-              <Text style={styles.timerDoneText}>Rest is over. Next set.</Text>
-              <Button title="Dismiss" variant="secondary" onPress={stopTimer} />
-            </View>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={styles.topSection}>
+          <BackButton onPress={() => navigation.goBack()} />
+          
+          {isLoading && !workoutDetails ? (
+            <ActivityIndicator color={colors.accent} style={{ marginVertical: 20 }} />
           ) : (
-            <View style={styles.timerRow}>
-              <Text style={styles.timerDisplay}>{formatTime(timeLeft)}</Text>
-              <View style={styles.timerBtns}>
-                <TouchableOpacity style={styles.chip} onPress={() => startTimer(60)}>
-                  <Text style={styles.chipText}>60s</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.chip} onPress={() => startTimer(90)}>
-                  <Text style={styles.chipText}>90s</Text>
-                </TouchableOpacity>
-                {timerState === 'running' ? (
-                  <TouchableOpacity style={styles.chipStop} onPress={stopTimer}>
-                    <Text style={styles.chipStopText}>Stop</Text>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
+            <View style={styles.workoutMeta}>
+              <Title>{workoutDetails?.name}</Title>
+              {workoutDetails?.description ? (
+                <Text style={styles.description}>{workoutDetails.description}</Text>
+              ) : null}
             </View>
           )}
-        </Card>
-      </View>
 
-      <FlatList
-        data={workoutDetails?.exercises || []}
-        keyExtractor={(item) => item.id}
-        renderItem={renderExercise}
-        contentContainerStyle={styles.list}
-        ListHeaderComponent={
-          <View style={styles.listHeader}>
-            <Text style={styles.sectionTitle}>Exercises</Text>
-            <Text style={styles.hint}>Tap a set to mark it done.</Text>
-            <Button
-              title="Add exercise"
-              variant="secondary"
-              icon="add"
-              onPress={() => navigation.navigate('AddExercise', { workoutId: workoutDetails?.id })}
-            />
-          </View>
-        }
-        ListEmptyComponent={
-          isLoading ? null : <Text style={styles.empty}>No exercises yet. Add the first one.</Text>
-        }
-        ListFooterComponent={
-          <View style={styles.footer}>
-            <Button title="Finish session" onPress={handleFinishWorkout} loading={isFinishing} />
-            <Button title="Duplicate workout" variant="secondary" onPress={handleCloneWorkout} loading={isCloning} />
-            <Button title="Delete workout" variant="danger" onPress={handleDeleteWorkout} />
-          </View>
-        }
-      />
+          {/* Card do Temporizador de Descanso com Vibração */}
+          <Card style={[styles.timerCard, timerState === 'finished' && styles.timerCardFinished]}>
+            <View style={styles.timerTop}>
+              <View style={styles.timerLabelRow}>
+                <Ionicons name="timer-outline" size={15} color={timerState === 'finished' ? colors.accent : colors.muted} />
+                <Text style={[styles.timerLabel, timerState === 'finished' && { color: colors.accent }]}>
+                  {timerState === 'finished' ? t('workouts.timerVibrated') : t('workouts.restBetweenSets')}
+                </Text>
+              </View>
+              {timerState === 'running' ? (
+                <TouchableOpacity onPress={stopTimer}>
+                  <Text style={styles.timerStopText}>{t('common.cancel')}</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {timerState === 'finished' ? (
+              <View style={styles.timerFinishedBox}>
+                <Text style={styles.timerFinishedText}>{t('workouts.restCompleted')}</Text>
+                <TouchableOpacity style={styles.dismissBtn} onPress={stopTimer}>
+                  <Text style={styles.dismissBtnText}>OK</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.timerControlRow}>
+                <Text style={styles.timerDigit}>{formatTime(timeLeft)}</Text>
+                <View style={styles.quickChips}>
+                  <TouchableOpacity style={styles.chip} onPress={() => startTimer(45)}>
+                    <Text style={styles.chipText}>45s</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.chip} onPress={() => startTimer(60)}>
+                    <Text style={styles.chipText}>60s</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.chip} onPress={() => startTimer(90)}>
+                    <Text style={styles.chipText}>90s</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.chip} onPress={() => startTimer(120)}>
+                    <Text style={styles.chipText}>120s</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </Card>
+        </View>
+
+        <FlatList
+          data={workoutDetails?.exercises || []}
+          keyExtractor={(item) => item.id}
+          renderItem={renderExercise}
+          contentContainerStyle={styles.listContainer}
+          ListHeaderComponent={
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionHeading}>{t('workouts.prescribedExercises')}</Text>
+              <Button
+                title={t('workouts.addExercise')}
+                variant="secondary"
+                icon="add"
+                onPress={() => navigation.navigate('AddExercise', { workoutId: workoutDetails?.id })}
+              />
+            </View>
+          }
+          ListEmptyComponent={
+            isLoading ? null : (
+              <Text style={styles.emptyText}>{t('workouts.noExercises')}</Text>
+            )
+          }
+          ListFooterComponent={
+            <View style={styles.footerContainer}>
+              <Card style={styles.notesCard}>
+                <Text style={styles.notesLabel}>{t('workouts.sessionNotes')}</Text>
+                <TextInput
+                  style={styles.notesInput}
+                  placeholder={t('workouts.sessionNotesPlaceholder')}
+                  placeholderTextColor={colors.muted}
+                  multiline
+                  numberOfLines={3}
+                  value={workoutNotes}
+                  onChangeText={setWorkoutNotes}
+                />
+              </Card>
+
+              <Button
+                title={t('workouts.finishWorkout')}
+                onPress={handleFinishWorkout}
+                loading={isFinishing}
+              />
+              <Button
+                title={t('workouts.cloneWorkout')}
+                variant="secondary"
+                onPress={handleCloneWorkout}
+                loading={isCloning}
+              />
+              <Button
+                title={t('common.delete')}
+                variant="danger"
+                onPress={handleDeleteWorkout}
+              />
+            </View>
+          }
+        />
+      </KeyboardAvoidingView>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  pad: { paddingHorizontal: space.lg },
-  description: { color: colors.muted, fontSize: 15, marginTop: 8, marginBottom: 16, lineHeight: 22 },
-  timer: { marginTop: 16, marginBottom: 8 },
-  timerDone: { borderColor: colors.accent },
-  timerLabel: { color: colors.muted, fontSize: 13, fontWeight: '600', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.4 },
-  timerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  timerDisplay: { color: colors.text, fontSize: 32, fontWeight: '700', letterSpacing: -0.8, width: 90 },
-  timerBtns: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', flex: 1 },
-  timerDoneText: { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 12 },
+const getStyles = (colors: ColorScheme) => StyleSheet.create({
+  topSection: {
+    paddingHorizontal: space.lg,
+  },
+  workoutMeta: {
+    marginVertical: 4,
+  },
+  description: {
+    color: colors.muted,
+    fontSize: 14,
+    marginTop: 4,
+    lineHeight: 20,
+  },
+  timerCard: {
+    marginTop: 12,
+    marginBottom: 6,
+    padding: 12,
+  },
+  timerCardFinished: {
+    borderColor: colors.accent,
+    backgroundColor: colors.surface2,
+  },
+  timerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  timerLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  timerLabel: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  timerStopText: {
+    color: colors.danger,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  timerControlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  timerDigit: {
+    color: colors.text,
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+  },
+  quickChips: {
+    flexDirection: 'row',
+    gap: 6,
+  },
   chip: {
     backgroundColor: colors.surface2,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     borderRadius: radius.sm,
   },
-  chipText: { color: colors.text, fontWeight: '600' },
-  chipStop: { backgroundColor: colors.dangerDim, paddingVertical: 8, paddingHorizontal: 12, borderRadius: radius.sm },
-  chipStopText: { color: colors.danger, fontWeight: '600' },
-  list: { paddingHorizontal: space.lg, paddingBottom: 32 },
-  listHeader: { marginTop: 12, marginBottom: 12, gap: 10 },
-  sectionTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
-  hint: { color: colors.muted, fontSize: 13, marginBottom: 4 },
-  exerciseCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 14,
-    marginBottom: 10,
+  chipText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  timerFinishedBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'space-between',
+    paddingVertical: 4,
   },
-  exerciseDone: { opacity: 0.55 },
-  check: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1.5,
-    borderColor: colors.border,
+  timerFinishedText: {
+    color: colors.accent,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  dismissBtn: {
+    backgroundColor: colors.accent,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: radius.sm,
+  },
+  dismissBtnText: {
+    color: colors.bg,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  listContainer: {
+    paddingHorizontal: space.lg,
+    paddingBottom: 40,
+  },
+  sectionHeader: {
+    marginTop: 14,
+    marginBottom: 12,
+    gap: 10,
+  },
+  sectionHeading: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  exerciseBlock: {
+    marginBottom: 12,
+    padding: 14,
+  },
+  exerciseHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: 6,
   },
-  checkOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-  exerciseInfo: { flex: 1 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  headerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    flex: 1,
+  },
+  exerciseTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+  },
   prBadge: {
-    backgroundColor: colors.accentDim,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface2,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.accent,
   },
-  prText: { color: colors.accent, fontSize: 11, fontWeight: '700' },
-  exerciseName: { fontSize: 16, fontWeight: '600', color: colors.text },
-  exerciseDetails: { fontSize: 13, color: colors.muted, marginTop: 4 },
-  doneText: { textDecorationLine: 'line-through', color: colors.muted },
-  actions: { flexDirection: 'row' },
-  iconBtn: { padding: 6 },
-  empty: { color: colors.muted, textAlign: 'center', marginTop: 20, lineHeight: 22 },
-  footer: { marginTop: 8, gap: 10 },
+  prBadgeText: {
+    color: colors.accent,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerIconBtn: {
+    padding: 6,
+  },
+  exerciseNotes: {
+    color: colors.muted,
+    fontSize: 13,
+    marginBottom: 10,
+    lineHeight: 18,
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    marginBottom: 8,
+    gap: 6,
+  },
+  colHeader: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  setRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 5,
+    gap: 6,
+  },
+  setRowCompleted: {
+    opacity: 0.55,
+  },
+  setTypeBtn: {
+    width: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  setBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  setBadgeNormal: {
+    backgroundColor: colors.surface2,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  setBadgeWarmup: {
+    backgroundColor: '#F59E0B22',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  setBadgeDropset: {
+    backgroundColor: '#8B5CF622',
+    borderWidth: 1,
+    borderColor: '#8B5CF6',
+  },
+  setBadgeFailure: {
+    backgroundColor: '#EF444422',
+    borderWidth: 1,
+    borderColor: '#EF4444',
+  },
+  setBadgeText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  previousCell: {
+    width: 66,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previousText: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  stepperContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+    height: 34,
+  },
+  stepperBtn: {
+    width: 24,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
+  stepperBtnText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  stepperInput: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    paddingHorizontal: 2,
+    paddingVertical: 0,
+  },
+  checkBtn: {
+    width: 38,
+    height: 34,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkBtnActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  setActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  addSetInlineBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  addSetInlineText: {
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  removeSetInlineBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  removeSetInlineText: {
+    color: colors.danger,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  emptyText: {
+    color: colors.muted,
+    textAlign: 'center',
+    marginVertical: 24,
+    fontSize: 14,
+  },
+  notesCard: {
+    marginBottom: 14,
+    padding: 12,
+  },
+  notesLabel: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  notesInput: {
+    color: colors.text,
+    fontSize: 14,
+    minHeight: 60,
+    textAlignVertical: 'top',
+  },
+  footerContainer: {
+    marginTop: 10,
+    gap: 10,
+  },
 });

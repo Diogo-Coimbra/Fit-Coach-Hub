@@ -3,72 +3,66 @@ import { StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-na
 import { useAuthStore } from '../store/useAuthStore';
 import { BackButton, Button, Field, Screen, showAlert, Subtitle, Title } from '../components/ui';
 import { space } from '../theme';
+import { api } from '../services/api';
+import { useLanguage } from '../store/useLanguageStore';
 
-export default function AIGeneratorScreen({ navigation }: any) {
+export default function AIGeneratorScreen({ route, navigation }: any) {
   const { user } = useAuthStore();
+  const { t } = useLanguage();
+  const targetClientId = route?.params?.targetClientId;
+
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
-      showAlert('Describe your workout', 'Tell the AI what you want, then generate a plan.');
+      showAlert(t('workouts.aiDescribeWorkoutTitle'), t('workouts.aiDescribeWorkoutMsg'));
       return;
     }
 
     if (!user?.id) {
-      showAlert('Error', 'User not found.');
+      showAlert(t('common.error'), t('common.error'));
       return;
     }
 
     setIsGenerating(true);
 
     try {
-      const aiResponse = await fetch('http://192.168.1.80:3000/api/ai/generate-workout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt }),
+      const generatedData = await api.post('/api/ai/generate-workout', { prompt });
+
+      const newWorkout = await api.post('/api/workouts', {
+        name: generatedData.name,
+        description: generatedData.description || t('workouts.aiGeneratedDefault'),
+        targetClientId: targetClientId || undefined,
       });
-
-      if (!aiResponse.ok) throw new Error('AI request failed');
-      const generatedData = await aiResponse.json();
-
-      const workoutResponse = await fetch('http://192.168.1.80:3000/api/workouts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: generatedData.name,
-          description: generatedData.description || 'Generated with AI',
-          userId: user.id,
-        }),
-      });
-
-      if (!workoutResponse.ok) throw new Error('Failed to save workout');
-      const newWorkout = await workoutResponse.json();
 
       if (generatedData.exercises && generatedData.exercises.length > 0) {
         const exercisePromises = generatedData.exercises.map((ex: any) =>
-          fetch('http://192.168.1.80:3000/api/exercises', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: ex.name,
-              sets: ex.sets || 3,
-              reps: ex.reps || 10,
-              weight: ex.weight || null,
-              workoutId: newWorkout.id,
-            }),
+          api.post('/api/exercises', {
+            name: ex.name,
+            sets: ex.sets || 3,
+            reps: ex.reps || 10,
+            weight: ex.weight || null,
+            workoutId: newWorkout.id,
           })
         );
 
         await Promise.all(exercisePromises);
       }
 
-      showAlert('Workout created', 'Your plan is ready on the home screen.');
+      showAlert(
+        t('workouts.aiWorkoutCreatedTitle'),
+        targetClientId ? t('workouts.aiWorkoutAssignedSuccess') : t('workouts.aiWorkoutReadySuccess')
+      );
       setPrompt('');
-      navigation.navigate('Dashboard');
-    } catch (error) {
+      if (targetClientId) {
+        navigation.goBack();
+      } else {
+        navigation.navigate('Dashboard');
+      }
+    } catch (error: any) {
       console.error('AI generation failed:', error);
-      showAlert('Could not generate', 'Try a shorter or more specific request.');
+      showAlert(t('workouts.aiFailedTitle'), error.message || t('workouts.aiFailedMsg'));
     } finally {
       setIsGenerating(false);
     }
@@ -78,15 +72,17 @@ export default function AIGeneratorScreen({ navigation }: any) {
     <Screen>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content}>
-          <BackButton onPress={() => navigation.goBack()} label="Home" />
-          <Title>AI workout</Title>
+          <BackButton onPress={() => navigation.goBack()} />
+          <Title>{t('workouts.aiWorkoutTitle')}</Title>
           <Subtitle>
-            Describe the session you want. Example: a 45-minute hypertrophy leg workout with 4 exercises.
+            {targetClientId
+              ? t('workouts.aiCoachSubtitle')
+              : t('workouts.aiClientSubtitle')}
           </Subtitle>
 
           <Field
-            label="Your request"
-            placeholder="Chest and triceps, strength focus..."
+            label={t('workouts.aiPromptLabel')}
+            placeholder={t('workouts.aiPromptPlaceholder')}
             multiline
             numberOfLines={5}
             textAlignVertical="top"
@@ -97,7 +93,7 @@ export default function AIGeneratorScreen({ navigation }: any) {
           />
 
           <Button
-            title={isGenerating ? 'Creating your plan...' : 'Generate workout'}
+            title={isGenerating ? t('workouts.generatingWorkout') : t('workouts.generateWorkoutBtn')}
             onPress={handleGenerate}
             loading={isGenerating}
           />

@@ -14,3 +14,10 @@ __pycache__/
 
 # NUNCA ENVIAR SEGREDOS PARA O GITHUB
 .env
+.env*.local
+!.env.example
+*.log
+
+# Uploads locais de utilizadores (armazenamento temporário/dev)
+uploads/
+backend/uploads/

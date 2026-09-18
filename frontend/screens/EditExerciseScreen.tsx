@@ -2,43 +2,42 @@ import React, { useState } from 'react';
 import { StyleSheet, View, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { BackButton, Button, Field, Screen, showAlert, Title } from '../components/ui';
 import { space } from '../theme';
+import { api } from '../services/api';
+import { useLanguage } from '../store/useLanguageStore';
 
 export default function EditExerciseScreen({ route, navigation }: any) {
   const { exercise } = route.params;
+  const { t } = useLanguage();
   const [name, setName] = useState(exercise.name);
   const [sets, setSets] = useState(exercise.sets.toString());
   const [reps, setReps] = useState(exercise.reps.toString());
   const [weight, setWeight] = useState(exercise.weight ? exercise.weight.toString() : '');
+  const [restSeconds, setRestSeconds] = useState(exercise.restSeconds ? exercise.restSeconds.toString() : '90');
+  const [notes, setNotes] = useState(exercise.notes || '');
   const [isSaving, setIsSaving] = useState(false);
 
   const handleUpdate = async () => {
     if (!name.trim() || !sets.trim() || !reps.trim()) {
-      showAlert('Missing fields', 'Name, sets, and reps are required.');
+      showAlert(t('workouts.requiredFieldsTitle'), t('workouts.requiredFieldsAlert'));
       return;
     }
 
     setIsSaving(true);
 
     try {
-      const response = await fetch(`http://192.168.1.80:3000/api/exercises/${exercise.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          sets: parseInt(sets),
-          reps: parseInt(reps),
-          weight: weight ? parseFloat(weight) : null,
-        }),
+      await api.put(`/api/exercises/${exercise.id}`, {
+        name: name.trim(),
+        sets: parseInt(sets),
+        reps: parseInt(reps),
+        weight: weight ? parseFloat(weight.replace(',', '.')) : null,
+        restSeconds: parseInt(restSeconds) || 90,
+        notes: notes.trim() || undefined,
       });
 
-      if (response.ok) {
-        navigation.goBack();
-      } else {
-        throw new Error('Update failed');
-      }
-    } catch (error) {
-      console.error('Failed to update exercise:', error);
-      showAlert('Error', 'Could not save your changes.');
+      navigation.goBack();
+    } catch (error: any) {
+      console.error('Falha ao atualizar exercício:', error);
+      showAlert(t('common.error'), error.message || t('common.error'));
     } finally {
       setIsSaving(false);
     }
@@ -48,29 +47,69 @@ export default function EditExerciseScreen({ route, navigation }: any) {
     <Screen>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content}>
-          <BackButton onPress={() => navigation.goBack()} label="Cancel" />
-          <Title>Edit exercise</Title>
+          <BackButton onPress={() => navigation.goBack()} />
+          <Title>{t('workouts.editExerciseTitle')}</Title>
 
-          <Field label="Exercise" value={name} onChangeText={setName} placeholder="Bench press" />
+          <Field
+            label={t('workouts.exerciseName')}
+            value={name}
+            onChangeText={setName}
+            placeholder={t('workouts.exerciseNamePlaceholder')}
+          />
 
           <View style={styles.row}>
             <View style={styles.half}>
-              <Field label="Sets" value={sets} onChangeText={setSets} placeholder="4" keyboardType="numeric" />
+              <Field
+                label={t('workouts.setsLabel')}
+                value={sets}
+                onChangeText={setSets}
+                placeholder="3"
+                keyboardType="numeric"
+              />
             </View>
             <View style={styles.half}>
-              <Field label="Reps" value={reps} onChangeText={setReps} placeholder="10" keyboardType="numeric" />
+              <Field
+                label={t('workouts.repsLabel')}
+                value={reps}
+                onChangeText={setReps}
+                placeholder="10"
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
+
+          <View style={styles.row}>
+            <View style={styles.half}>
+              <Field
+                label={t('workouts.weightLabel')}
+                value={weight}
+                onChangeText={setWeight}
+                placeholder="60"
+                keyboardType="numeric"
+              />
+            </View>
+            <View style={styles.half}>
+              <Field
+                label={t('workouts.restSecondsLabel')}
+                value={restSeconds}
+                onChangeText={setRestSeconds}
+                placeholder="90"
+                keyboardType="numeric"
+              />
             </View>
           </View>
 
           <Field
-            label="Weight (kg), optional"
-            value={weight}
-            onChangeText={setWeight}
-            placeholder="60"
-            keyboardType="numeric"
+            label={t('workouts.notesLabel')}
+            value={notes}
+            onChangeText={setNotes}
+            placeholder={t('workouts.notesPlaceholder')}
+            multiline
+            numberOfLines={3}
+            style={{ minHeight: 80, textAlignVertical: 'top' }}
           />
 
-          <Button title="Save changes" onPress={handleUpdate} loading={isSaving} />
+          <Button title={t('common.save')} onPress={handleUpdate} loading={isSaving} />
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>

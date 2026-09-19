@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../store/useThemeStore';
+import { useLanguage } from '../store/useLanguageStore';
 import { radius, space } from '../theme';
 
 interface PrivacyTermsModalProps {
@@ -19,6 +20,7 @@ interface PrivacyTermsModalProps {
 
 export default function PrivacyTermsModal({ visible, onClose }: PrivacyTermsModalProps) {
   const { colors } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
@@ -27,10 +29,10 @@ export default function PrivacyTermsModal({ visible, onClose }: PrivacyTermsModa
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.headerTitle, { color: colors.text }]}>
-              Termos & Privacidade
+              {t('privacyTerms.headerTitle')}
             </Text>
             <Text style={[styles.headerSub, { color: colors.muted }]}>
-              Termos de Serviço e Proteção de Dados (RGPD)
+              {t('privacyTerms.headerSub')}
             </Text>
           </View>
           <TouchableOpacity onPress={onClose} style={[styles.closeBtn, { backgroundColor: colors.surface }]}>
@@ -43,100 +45,100 @@ export default function PrivacyTermsModal({ visible, onClose }: PrivacyTermsModa
           <View style={[styles.badge, { backgroundColor: colors.accent + '20' }]}>
             <Ionicons name="shield-checkmark" size={16} color={colors.accent} />
             <Text style={[styles.badgeText, { color: colors.accent }]}>
-              Atualizado em Setembro de 2026 · Conforme com RGPD & App Store
+              {t('privacyTerms.badgeText')}
             </Text>
           </View>
 
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            1. Objeto e Âmbito da Aplicação
+            {t('privacyTerms.sec1Title')}
           </Text>
           <Text style={[styles.paragraph, { color: colors.text }]}>
-            A presente plataforma tem como objetivo proporcionar a Personal Trainers e respetivos alunos um ambiente digital para prescrição de treinos, monitorização de cargas, registo nutricional, check-ins de evolução corporal e comunicação direta. Ao utilizar a aplicação, o utilizador declara aceitar os presentes Termos de Uso.
+            {t('privacyTerms.sec1Text')}
           </Text>
 
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            2. Recolha e Finalidade de Dados Pessoais
+            {t('privacyTerms.sec2Title')}
           </Text>
           <Text style={[styles.paragraph, { color: colors.text }]}>
-            Para garantir o correto funcionamento do serviço, recolhemos os seguintes dados:
+            {t('privacyTerms.sec2Text')}
           </Text>
           <View style={styles.bulletList}>
             <Text style={[styles.bulletItem, { color: colors.text }]}>
-              • <Text style={{ fontWeight: '700' }}>Dados de Registo:</Text> Nome, endereço de email e palavra-passe encriptada (ou identificador único autenticado via Google).
+              • {t('privacyTerms.sec2Bullet1')}
             </Text>
             <Text style={[styles.bulletItem, { color: colors.text }]}>
-              • <Text style={{ fontWeight: '700' }}>Dados Fisiológicos e de Saúde:</Text> Peso corporal, percentagem de massa gorda, registo de treinos efetuados, feedback de fadiga (RPE) e eventuais indicações de dor ou desconforto articular reportadas voluntariamente.
+              • {t('privacyTerms.sec2Bullet2')}
             </Text>
             <Text style={[styles.bulletItem, { color: colors.text }]}>
-              • <Text style={{ fontWeight: '700' }}>Fotografias de Evolução Corporal:</Text> Fotos enviadas nos check-ins semanais (frente, costas, perfil) com a finalidade exclusiva de avaliação técnica comparativa ("Antes & Depois") pelo treinador atribuído.
+              • {t('privacyTerms.sec2Bullet3')}
             </Text>
           </View>
 
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            3. Confidencialidade e Isolamento dos Dados
+            {t('privacyTerms.sec3Title')}
           </Text>
           <Text style={[styles.paragraph, { color: colors.text }]}>
-            Todos os dados de saúde, registos de treino, fotografias e mensagens trocadas no chat são <Text style={{ fontWeight: '700' }}>estritamente confidenciais</Text> e isolados. Nenhum aluno tem acesso a dados de outros alunos. O acesso aos dados do aluno está estritamente restrito ao Personal Trainer com quem o aluno estabeleceu uma ligação consented por código de convite.
+            {t('privacyTerms.sec3Text')}
           </Text>
 
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            4. Segurança e Armazenamento
+            {t('privacyTerms.sec4Title')}
           </Text>
           <Text style={[styles.paragraph, { color: colors.text }]}>
-            Adotamos medidas técnicas robustas de salvaguarda:
+            {t('privacyTerms.sec4Text')}
           </Text>
           <View style={styles.bulletList}>
             <Text style={[styles.bulletItem, { color: colors.text }]}>
-              • Palavras-passe encriptadas unidirecionalmente com o algoritmo BCrypt com salt hashing.
+              • {t('privacyTerms.sec4Bullet1')}
             </Text>
             <Text style={[styles.bulletItem, { color: colors.text }]}>
-              • Sessões autenticadas através de JSON Web Tokens (JWT) seguros e comunicação protegida por protocolo HTTPS/SSL.
+              • {t('privacyTerms.sec4Bullet2')}
             </Text>
             <Text style={[styles.bulletItem, { color: colors.text }]}>
-              • Processamento de pagamentos efetuado integralmente através da plataforma Stripe, sem que quaisquer dados de cartão de crédito passem pelos nossos servidores.
+              • {t('privacyTerms.sec4Bullet3')}
             </Text>
           </View>
 
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            5. Direitos do Titular dos Dados (RGPD / GDPR)
+            {t('privacyTerms.sec5Title')}
           </Text>
           <Text style={[styles.paragraph, { color: colors.text }]}>
-            Ao abrigo do Regulamento Geral sobre a Proteção de Dados (RGPD), o utilizador tem o direito de:
+            {t('privacyTerms.sec5Text')}
           </Text>
           <View style={styles.bulletList}>
             <Text style={[styles.bulletItem, { color: colors.text }]}>
-              • Aceder, consultar e atualizar os seus dados a qualquer momento no ecrã de Perfil.
+              • {t('privacyTerms.sec5Bullet1')}
             </Text>
             <Text style={[styles.bulletItem, { color: colors.text }]}>
-              • Exportar relatórios em formato PDF com as suas métricas e fotografias.
+              • {t('privacyTerms.sec5Bullet2')}
             </Text>
             <Text style={[styles.bulletItem, { color: colors.text }]}>
-              • Solicitar a remoção ou revogação de consentimento de acesso ao treinador.
+              • {t('privacyTerms.sec5Bullet3')}
             </Text>
           </View>
 
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            6. Direito ao Esquecimento e Eliminação de Conta (Diretriz Apple 5.1.1)
+            {t('privacyTerms.sec6Title')}
           </Text>
           <Text style={[styles.paragraph, { color: colors.text }]}>
-            Em estrito cumprimento das diretrizes de privacidade internacionais e da Apple App Store (Diretriz 5.1.1(v)), o utilizador tem a faculdade de <Text style={{ fontWeight: '700' }}>eliminar permanentemente a sua conta</Text> diretamente dentro da aplicação através do botão "Eliminar Conta" disponível nas definições do seu Perfil.
+            {t('privacyTerms.sec6Text')}
           </Text>
           <Text style={[styles.paragraph, { color: colors.text }]}>
-            A eliminação da conta é imediata, irreversível e remove em cascata todos os treinos, registos de séries, diários de refeições, check-ins, fotografias de evolução, ficheiros de áudio e histórico de conversas dos nossos servidores.
+            {t('privacyTerms.sec6Subtext')}
           </Text>
 
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            7. Contacto e Suporte
+            {t('privacyTerms.sec7Title')}
           </Text>
           <Text style={[styles.paragraph, { color: colors.text }]}>
-            Para qualquer esclarecimento, exercício dos seus direitos de privacidade ou suporte técnico, poderá contactar a equipa através do endereço: <Text style={{ fontWeight: '700', color: colors.accent }}>suporte@fit-ai.app</Text>.
+            {t('privacyTerms.sec7Text')}
           </Text>
 
           <TouchableOpacity
             style={[styles.confirmBtn, { backgroundColor: colors.accent }]}
             onPress={onClose}
           >
-            <Text style={[styles.confirmBtnText, { color: colors.bg }]}>Compreendi e Concordo</Text>
+            <Text style={[styles.confirmBtnText, { color: colors.bg }]}>{t('privacyTerms.agreeBtn')}</Text>
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>

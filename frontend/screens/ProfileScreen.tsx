@@ -274,22 +274,22 @@ export default function ProfileScreen({ navigation }: any) {
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      'Eliminar Conta Permanentemente',
-      'Tens a certeza absoluta que pretendes eliminar a tua conta? Esta ação é irreversível e apagará definitivamente todos os teus treinos, check-ins, fotos de evolução e mensagens.',
+      t('profile.deleteAccountTitle'),
+      t('profile.deleteAccountMsg'),
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Sim, Eliminar Definitivamente',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               setIsDeletingAccount(true);
               await api.delete('/api/users/me');
-              showAlert('Conta Eliminada', 'A tua conta e todos os dados foram eliminados com sucesso.');
+              showAlert(t('common.success'), t('profile.deleteAccountTitle'));
               logout();
             } catch (err: any) {
               console.error('Erro ao eliminar conta:', err);
-              showAlert(t('common.error'), err.message || 'Não foi possível eliminar a conta.');
+              showAlert(t('common.error'), err.message || t('common.error'));
             } finally {
               setIsDeletingAccount(false);
             }
@@ -775,7 +775,7 @@ export default function ProfileScreen({ navigation }: any) {
         >
           <Ionicons name="shield-checkmark-outline" size={18} color={colors.accent} />
           <Text style={[styles.termsBtnText, { color: colors.text }]}>
-            Termos de Uso & Política de Privacidade (RGPD)
+            {t('profile.termsAndPrivacyBtn')}
           </Text>
           <Ionicons name="chevron-forward" size={16} color={colors.muted} />
         </TouchableOpacity>
@@ -788,10 +788,10 @@ export default function ProfileScreen({ navigation }: any) {
         {/* Zona de Eliminação de Conta (Diretriz Apple 5.1.1(v)) */}
         <View style={[styles.dangerZone, { borderColor: 'rgba(239, 68, 68, 0.3)', backgroundColor: 'rgba(239, 68, 68, 0.05)' }]}>
           <Text style={[styles.dangerZoneTitle, { color: colors.danger }]}>
-            Gestão de Conta & Privacidade
+            {t('profile.accountAndPrivacy')}
           </Text>
           <Text style={[styles.dangerZoneSub, { color: colors.muted }]}>
-            Podes eliminar permanentemente a tua conta e todos os teus dados (treinos, fotos de evolução, check-ins e mensagens).
+            {t('profile.deleteAccountMsg')}
           </Text>
           <TouchableOpacity
             style={[styles.deleteAccountBtn, { borderColor: colors.danger }]}
@@ -804,7 +804,7 @@ export default function ProfileScreen({ navigation }: any) {
               <>
                 <Ionicons name="trash-outline" size={16} color={colors.danger} />
                 <Text style={[styles.deleteAccountBtnText, { color: colors.danger }]}>
-                  Eliminar a Minha Conta
+                  {t('profile.deleteAccountBtn')}
                 </Text>
               </>
             )}

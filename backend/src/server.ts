@@ -893,7 +893,7 @@ app.get('/api/coach/templates', authenticateToken, requireActiveCoach, async (re
 app.post('/api/coach/templates', authenticateToken, requireActiveCoach, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const coachId = req.user!.id;
-    const { name, description, category, exercises } = req.body;
+    const { name, description, category, routineTag, programName, exercises } = req.body;
 
     if (!name) {
       return res.status(400).json({ error: 'O nome do modelo de treino é obrigatório.' });
@@ -904,6 +904,8 @@ app.post('/api/coach/templates', authenticateToken, requireActiveCoach, async (r
         name,
         description: description || null,
         category: category || null,
+        routineTag: routineTag ? String(routineTag).trim().toUpperCase() : null,
+        programName: programName ? String(programName).trim() : null,
         userId: coachId,
         isTemplate: true,
         exercises: exercises && exercises.length > 0 ? {
@@ -914,6 +916,10 @@ app.post('/api/coach/templates', authenticateToken, requireActiveCoach, async (r
             weight: ex.weight ? Number(ex.weight) : null,
             restSeconds: Number(ex.restSeconds) || 90,
             notes: ex.notes ? String(ex.notes).trim() : null,
+            isCardio: !!ex.isCardio,
+            durationMinutes: ex.durationMinutes ? Number(ex.durationMinutes) : null,
+            intensity: ex.intensity ? String(ex.intensity).trim() : null,
+            videoUrl: ex.videoUrl ? String(ex.videoUrl).trim() : null,
           })),
         } : undefined,
       },
@@ -1058,6 +1064,11 @@ app.post('/api/coach/assign-workout', authenticateToken, requireActiveCoach, asy
               weight: ex.weight,
               restSeconds: ex.restSeconds || 90,
               notes: ex.notes || null,
+              isCardio: ex.isCardio,
+              durationMinutes: ex.durationMinutes,
+              intensity: ex.intensity,
+              videoUrl: ex.videoUrl,
+              audioUrl: ex.audioUrl,
             })),
           },
         },
@@ -1082,6 +1093,11 @@ app.post('/api/coach/assign-workout', authenticateToken, requireActiveCoach, asy
               weight: ex.weight || null,
               restSeconds: ex.restSeconds || 90,
               notes: ex.notes || null,
+              isCardio: !!ex.isCardio,
+              durationMinutes: ex.durationMinutes ? Number(ex.durationMinutes) : null,
+              intensity: ex.intensity ? String(ex.intensity).trim() : null,
+              videoUrl: ex.videoUrl ? String(ex.videoUrl).trim() : null,
+              audioUrl: ex.audioUrl ? String(ex.audioUrl).trim() : null,
             })),
           } : undefined,
         },
@@ -1175,7 +1191,7 @@ app.post('/api/workouts', authenticateToken, async (req: AuthenticatedRequest, r
         programName: programName ? String(programName).trim() : null,
         userId: targetUserId,
         assignedById,
-        isTemplate: callerRole === 'COACH' && !targetClientId ? !!isTemplate : false,
+        isTemplate: callerRole === 'COACH' && !targetClientId ? (isTemplate !== undefined ? !!isTemplate : true) : false,
       },
       include: {
         exercises: true,
@@ -1333,6 +1349,11 @@ app.post('/api/workouts/:workoutId/clone', authenticateToken, async (req: Authen
             weight: ex.weight,
             restSeconds: ex.restSeconds || 90,
             notes: ex.notes || null,
+            isCardio: ex.isCardio,
+            durationMinutes: ex.durationMinutes,
+            intensity: ex.intensity,
+            videoUrl: ex.videoUrl,
+            audioUrl: ex.audioUrl,
           })),
         },
       },
@@ -1390,7 +1411,7 @@ app.post('/api/exercises', authenticateToken, async (req: AuthenticatedRequest, 
   try {
     const callerId = req.user!.id;
     const callerRole = req.user!.role;
-    const { name, sets, reps, weight, restSeconds, notes, videoUrl, workoutId } = req.body;
+    const { name, sets, reps, weight, restSeconds, notes, videoUrl, isCardio, durationMinutes, intensity, workoutId } = req.body;
 
     if (!name || !workoutId) {
       return res.status(400).json({ error: 'O nome do exercício e o ID do treino são obrigatórios.' });
@@ -1415,12 +1436,15 @@ app.post('/api/exercises', authenticateToken, async (req: AuthenticatedRequest, 
     const newExercise = await prisma.exercise.create({
       data: {
         name,
-        sets: sets ? Number(sets) : 3,
-        reps: reps ? Number(reps) : 10,
+        sets: sets ? Number(sets) : (isCardio ? 1 : 3),
+        reps: reps ? Number(reps) : (isCardio ? 1 : 10),
         weight: weight !== undefined && weight !== null ? Number(weight) : null,
-        restSeconds: restSeconds ? Number(restSeconds) : 90,
+        restSeconds: restSeconds ? Number(restSeconds) : (isCardio ? 0 : 90),
         notes: notes ? String(notes).trim() : null,
         videoUrl: videoUrl ? String(videoUrl).trim() : null,
+        isCardio: !!isCardio,
+        durationMinutes: durationMinutes ? Number(durationMinutes) : null,
+        intensity: intensity ? String(intensity).trim() : null,
         workoutId,
       },
     });
@@ -1439,7 +1463,7 @@ app.put('/api/exercises/:exerciseId', authenticateToken, async (req: Authenticat
     const callerId = req.user!.id;
     const callerRole = req.user!.role;
     const exerciseId = toStr(req.params.exerciseId);
-    const { name, sets, reps, weight, restSeconds, notes, videoUrl } = req.body;
+    const { name, sets, reps, weight, restSeconds, notes, videoUrl, isCardio, durationMinutes, intensity } = req.body;
 
     const accessCheck = await canAccessExercise(callerId, callerRole, exerciseId);
     if (!accessCheck.allowed) {
@@ -1455,7 +1479,9 @@ app.put('/api/exercises/:exerciseId', authenticateToken, async (req: Authenticat
         reps !== undefined ||
         weight !== undefined ||
         restSeconds !== undefined ||
-        notes !== undefined;
+        notes !== undefined ||
+        durationMinutes !== undefined ||
+        intensity !== undefined;
 
       if (hasStructureEdit && name === undefined) {
         return res.status(403).json({
@@ -1476,6 +1502,9 @@ app.put('/api/exercises/:exerciseId', authenticateToken, async (req: Authenticat
       if (restSeconds !== undefined) updateData.restSeconds = Number(restSeconds);
       if (notes !== undefined) updateData.notes = notes ? String(notes).trim() : null;
       if (videoUrl !== undefined) updateData.videoUrl = videoUrl ? String(videoUrl).trim() : null;
+      if (isCardio !== undefined) updateData.isCardio = !!isCardio;
+      if (durationMinutes !== undefined) updateData.durationMinutes = durationMinutes ? Number(durationMinutes) : null;
+      if (intensity !== undefined) updateData.intensity = intensity ? String(intensity).trim() : null;
     }
 
     const updatedExercise = await prisma.exercise.update({
@@ -1674,6 +1703,8 @@ app.post('/api/logs', authenticateToken, async (req: AuthenticatedRequest, res: 
             completed: s.completed !== false,
             rpe: s.rpe ? Number(s.rpe) : null,
             setType: s.setType || 'NORMAL',
+            durationMinutes: s.durationMinutes ? Number(s.durationMinutes) : null,
+            intensity: s.intensity ? String(s.intensity).trim() : null,
           })),
         } : undefined,
       },
@@ -2553,6 +2584,68 @@ app.patch('/api/chat/:targetUserId/read', authenticateToken, async (req: Authent
   } catch (error) {
     console.error('Erro ao marcar mensagens como lidas:', error);
     res.status(500).json({ error: 'Erro ao atualizar estado de leitura.' });
+  }
+});
+
+// Editar mensagem de texto do chat (PATCH) - Protegido
+app.patch('/api/chat/messages/:messageId', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const callerId = req.user!.id;
+    const messageId = toStr(req.params.messageId);
+    const { text } = req.body;
+
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: 'O texto da mensagem é obrigatório.' });
+    }
+
+    const message = await prisma.chatMessage.findUnique({ where: { id: messageId } });
+    if (!message) {
+      return res.status(404).json({ error: 'Mensagem não encontrada.' });
+    }
+
+    if (message.senderId !== callerId) {
+      return res.status(403).json({ error: 'Apenas o autor pode editar esta mensagem.' });
+    }
+
+    const updated = await prisma.chatMessage.update({
+      where: { id: messageId },
+      data: { text: text.trim() },
+      include: {
+        sender: { select: { id: true, name: true, role: true, picture: true } },
+      },
+    });
+
+    res.status(200).json(updated);
+  } catch (error) {
+    console.error('Erro ao editar mensagem de chat:', error);
+    res.status(500).json({ error: 'Erro ao editar mensagem.' });
+  }
+});
+
+// Remover/Apagar mensagem do chat (DELETE) - Protegido
+app.delete('/api/chat/messages/:messageId', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const callerId = req.user!.id;
+    const callerRole = req.user!.role;
+    const messageId = toStr(req.params.messageId);
+
+    const message = await prisma.chatMessage.findUnique({ where: { id: messageId } });
+    if (!message) {
+      return res.status(404).json({ error: 'Mensagem não encontrada.' });
+    }
+
+    const isAuthor = message.senderId === callerId;
+    const isCoachOfChannel = callerRole === 'COACH' && message.coachId === callerId;
+
+    if (!isAuthor && !isCoachOfChannel) {
+      return res.status(403).json({ error: 'Não tens permissão para apagar esta mensagem.' });
+    }
+
+    await prisma.chatMessage.delete({ where: { id: messageId } });
+    res.status(200).json({ success: true, messageId });
+  } catch (error) {
+    console.error('Erro ao apagar mensagem de chat:', error);
+    res.status(500).json({ error: 'Erro ao apagar mensagem.' });
   }
 });
 

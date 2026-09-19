@@ -265,7 +265,7 @@ export default function LoginScreen() {
                   authMode === 'login' && { color: mode === 'dark' ? '#0B0D10' : '#FFFFFF', fontWeight: '700' },
                 ]}
               >
-                Iniciar Sessão
+                {t('auth.loginTab')}
               </Text>
             </TouchableOpacity>
 
@@ -283,7 +283,7 @@ export default function LoginScreen() {
                   authMode === 'register' && { color: mode === 'dark' ? '#0B0D10' : '#FFFFFF', fontWeight: '700' },
                 ]}
               >
-                Criar Conta
+                {t('auth.registerTab')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -291,7 +291,7 @@ export default function LoginScreen() {
           {/* Seletor de Perfil (Apenas no Modo de Registo) */}
           {authMode === 'register' && (
             <View style={styles.rolePickerContainer}>
-              <Text style={[styles.inputLabel, { color: colors.muted }]}>Pretendes registar-te como:</Text>
+              <Text style={[styles.inputLabel, { color: colors.muted }]}>{t('auth.registerAsLabel')}</Text>
               <View style={[styles.roleTabs, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <TouchableOpacity
                   style={[
@@ -312,7 +312,7 @@ export default function LoginScreen() {
                       roleToRegister === 'COACH' && { color: mode === 'dark' ? '#0B0D10' : '#FFFFFF', fontWeight: '700' },
                     ]}
                   >
-                    Treinador / PT
+                    {t('auth.coach')}
                   </Text>
                 </TouchableOpacity>
 
@@ -335,13 +335,13 @@ export default function LoginScreen() {
                       roleToRegister === 'CLIENT' && { color: mode === 'dark' ? '#0B0D10' : '#FFFFFF', fontWeight: '700' },
                     ]}
                   >
-                    Aluno
+                    {t('auth.client')}
                   </Text>
                 </TouchableOpacity>
               </View>
               {roleToRegister === 'COACH' && (
                 <Text style={{ fontSize: 11, color: colors.accent, textAlign: 'center', marginTop: 6, fontWeight: '600' }}>
-                  🎁 Inclui 14 dias de teste grátis com acesso total a todas as ferramentas
+                  {t('auth.coachTrialNotice')}
                 </Text>
               )}
             </View>
@@ -351,12 +351,12 @@ export default function LoginScreen() {
           <View style={styles.formContainer}>
             {authMode === 'register' && (
               <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>Nome Completo</Text>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>{t('auth.fullName')}</Text>
                 <View style={[styles.inputBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <Ionicons name="person-outline" size={18} color={colors.muted} />
                   <TextInput
                     style={[styles.textInput, { color: colors.text }]}
-                    placeholder="Ex: Diogo Silva"
+                    placeholder={t('auth.fullNamePlaceholder')}
                     placeholderTextColor={colors.muted}
                     value={name}
                     onChangeText={setName}
@@ -367,12 +367,12 @@ export default function LoginScreen() {
             )}
 
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>Endereço de Email</Text>
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t('auth.email')}</Text>
               <View style={[styles.inputBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <Ionicons name="mail-outline" size={18} color={colors.muted} />
                 <TextInput
                   style={[styles.textInput, { color: colors.text }]}
-                  placeholder="teu.email@exemplo.com"
+                  placeholder={t('auth.emailPlaceholder')}
                   placeholderTextColor={colors.muted}
                   value={email}
                   onChangeText={setEmail}
@@ -384,7 +384,7 @@ export default function LoginScreen() {
 
             <View style={styles.inputGroup}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>Palavra-passe</Text>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>{t('auth.password')}</Text>
                 {authMode === 'login' && (
                   <TouchableOpacity
                     onPress={() => {
@@ -394,7 +394,7 @@ export default function LoginScreen() {
                     }}
                   >
                     <Text style={{ color: colors.accent, fontSize: 12, fontWeight: '600' }}>
-                      Esqueci-me da palavra-passe
+                      {t('auth.forgotPassword')}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -403,7 +403,7 @@ export default function LoginScreen() {
                 <Ionicons name="lock-closed-outline" size={18} color={colors.muted} />
                 <TextInput
                   style={[styles.textInput, { color: colors.text }]}
-                  placeholder="Mínimo 6 caracteres"
+                  placeholder={t('auth.passwordPlaceholder')}
                   placeholderTextColor={colors.muted}
                   secureTextEntry={!showPassword}
                   value={password}
@@ -421,12 +421,12 @@ export default function LoginScreen() {
 
             {authMode === 'register' && (
               <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>Confirmar Palavra-passe</Text>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>{t('auth.confirmPassword')}</Text>
                 <View style={[styles.inputBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <Ionicons name="shield-checkmark-outline" size={18} color={colors.muted} />
                   <TextInput
                     style={[styles.textInput, { color: colors.text }]}
-                    placeholder="Repete a tua palavra-passe"
+                    placeholder={t('auth.confirmPasswordPlaceholder')}
                     placeholderTextColor={colors.muted}
                     secureTextEntry={!showPassword}
                     value={confirmPassword}
@@ -446,7 +446,7 @@ export default function LoginScreen() {
                 <ActivityIndicator color={mode === 'dark' ? '#0B0D10' : '#FFFFFF'} />
               ) : (
                 <Text style={[styles.mainSubmitText, { color: mode === 'dark' ? '#0B0D10' : '#FFFFFF' }]}>
-                  {authMode === 'login' ? 'Entrar na Conta' : 'Criar Conta Gratuita'}
+                  {authMode === 'login' ? t('auth.loginBtn') : t('auth.registerBtn')}
                 </Text>
               )}
             </TouchableOpacity>
@@ -455,7 +455,7 @@ export default function LoginScreen() {
           {/* Divisor "ou continua com" */}
           <View style={styles.dividerRow}>
             <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-            <Text style={[styles.dividerText, { color: colors.muted }]}>ou continua com</Text>
+            <Text style={[styles.dividerText, { color: colors.muted }]}>{t('auth.orContinueWith')}</Text>
             <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
           </View>
 
@@ -470,12 +470,12 @@ export default function LoginScreen() {
           {/* Termos de Serviço e Política de Privacidade */}
           <View style={styles.termsContainer}>
             <Text style={[styles.termsText, { color: colors.muted }]}>
-              Ao continuar, declaras que concordas com os nossos{' '}
+              {t('auth.termsNotice')}{' '}
               <Text
                 style={{ color: colors.accent, fontWeight: '700', textDecorationLine: 'underline' }}
                 onPress={() => setIsTermsModalVisible(true)}
               >
-                Termos de Uso e Política de Privacidade
+                {t('auth.termsAndPrivacyLink')}
               </Text>
               .
             </Text>
@@ -518,7 +518,7 @@ export default function LoginScreen() {
           <View style={[styles.modalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>
-                Recuperar Palavra-passe
+                {t('auth.forgotTitle')}
               </Text>
               <TouchableOpacity onPress={() => setIsForgotModalVisible(false)}>
                 <Ionicons name="close" size={22} color={colors.muted} />
@@ -528,14 +528,14 @@ export default function LoginScreen() {
             {forgotStep === 1 ? (
               <View>
                 <Text style={[styles.modalSubtitle, { color: colors.muted }]}>
-                  Introduz o email associado à tua conta para receberes um código de verificação de 6 dígitos.
+                  {t('auth.forgotSubtitle')}
                 </Text>
 
                 <View style={[styles.inputBox, { backgroundColor: colors.bg, borderColor: colors.border, marginTop: 14 }]}>
                   <Ionicons name="mail-outline" size={18} color={colors.muted} />
                   <TextInput
                     style={[styles.textInput, { color: colors.text }]}
-                    placeholder="teu.email@exemplo.com"
+                    placeholder={t('auth.emailPlaceholder')}
                     placeholderTextColor={colors.muted}
                     value={forgotEmail}
                     onChangeText={setForgotEmail}
@@ -553,7 +553,7 @@ export default function LoginScreen() {
                     <ActivityIndicator color={mode === 'dark' ? '#0B0D10' : '#FFFFFF'} />
                   ) : (
                     <Text style={[styles.mainSubmitText, { color: mode === 'dark' ? '#0B0D10' : '#FFFFFF' }]}>
-                      Enviar Código de Recuperação
+                      {t('auth.sendCode')}
                     </Text>
                   )}
                 </TouchableOpacity>
@@ -561,14 +561,14 @@ export default function LoginScreen() {
             ) : (
               <View>
                 <Text style={[styles.modalSubtitle, { color: colors.muted }]}>
-                  Introduz o código de 6 dígitos enviado para {forgotEmail} e escolhe uma nova palavra-passe.
+                  {t('auth.codeStepSubtitle')} {forgotEmail}
                 </Text>
 
                 <View style={[styles.inputBox, { backgroundColor: colors.bg, borderColor: colors.border, marginTop: 14 }]}>
                   <Ionicons name="key-outline" size={18} color={colors.muted} />
                   <TextInput
                     style={[styles.textInput, { color: colors.text }]}
-                    placeholder="Código de 6 dígitos (Ex: 123456)"
+                    placeholder={t('auth.codePlaceholder')}
                     placeholderTextColor={colors.muted}
                     value={forgotCode}
                     onChangeText={setForgotCode}
@@ -580,7 +580,7 @@ export default function LoginScreen() {
                   <Ionicons name="lock-closed-outline" size={18} color={colors.muted} />
                   <TextInput
                     style={[styles.textInput, { color: colors.text }]}
-                    placeholder="Nova palavra-passe (mín. 6 car.)"
+                    placeholder={t('auth.passwordPlaceholder')}
                     placeholderTextColor={colors.muted}
                     secureTextEntry
                     value={forgotNewPassword}
@@ -597,7 +597,7 @@ export default function LoginScreen() {
                     <ActivityIndicator color={mode === 'dark' ? '#0B0D10' : '#FFFFFF'} />
                   ) : (
                     <Text style={[styles.mainSubmitText, { color: mode === 'dark' ? '#0B0D10' : '#FFFFFF' }]}>
-                      Redefinir Palavra-passe
+                      {t('auth.saveNewPassword')}
                     </Text>
                   )}
                 </TouchableOpacity>
@@ -607,7 +607,7 @@ export default function LoginScreen() {
                   onPress={() => setForgotStep(1)}
                 >
                   <Text style={{ color: colors.accent, fontSize: 13, fontWeight: '600' }}>
-                    ← Voltar e alterar email
+                    {t('auth.backToEmail')}
                   </Text>
                 </TouchableOpacity>
               </View>

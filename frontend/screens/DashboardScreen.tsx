@@ -385,7 +385,7 @@ export default function DashboardScreen({ navigation }: any) {
 
                 <TouchableOpacity
                   style={styles.action}
-                  onPress={() => navigation.navigate('CreateWorkout')}
+                  onPress={() => navigation.navigate('CreateWorkout', { isTemplate: true })}
                 >
                   <Ionicons name="add" size={20} color={colors.accent} />
                   <Text style={styles.actionText}>{t('dashboard.createWorkout')}</Text>

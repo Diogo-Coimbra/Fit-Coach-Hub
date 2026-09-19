@@ -56,7 +56,7 @@ export const WeeklyCheckInModal: React.FC<WeeklyCheckInModalProps> = ({
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(t('common.error'), 'Precisamos de permissão para aceder à galeria de fotos.');
+        Alert.alert(t('common.error'), t('weeklyCheckIn.permissionError'));
         return;
       }
 
@@ -85,14 +85,14 @@ export const WeeklyCheckInModal: React.FC<WeeklyCheckInModalProps> = ({
       }
     } catch (err: any) {
       console.error('Erro ao escolher foto:', err);
-      Alert.alert(t('common.error'), 'Não foi possível carregar a fotografia.');
+      Alert.alert(t('common.error'), t('weeklyCheckIn.photoPickError'));
     }
   };
 
   const handleSubmit = async () => {
     const numWeight = parseFloat(weight.replace(',', '.'));
     if (isNaN(numWeight) || numWeight <= 20 || numWeight >= 300) {
-      Alert.alert(t('common.error'), 'Por favor, introduz um peso válido em jejum (ex: 78.5).');
+      Alert.alert(t('common.error'), t('weeklyCheckIn.invalidWeightError'));
       return;
     }
 
@@ -112,8 +112,8 @@ export const WeeklyCheckInModal: React.FC<WeeklyCheckInModalProps> = ({
       });
 
       Alert.alert(
-        '🎉 Check-in Enviado!',
-        'O teu check-in semanal foi submetido com sucesso. O teu Personal Trainer foi notificado para rever a tua evolução e dar-te feedback.',
+        t('weeklyCheckIn.submitSuccessTitle'),
+        t('weeklyCheckIn.submitSuccessMsg'),
         [
           {
             text: 'OK',
@@ -126,7 +126,7 @@ export const WeeklyCheckInModal: React.FC<WeeklyCheckInModalProps> = ({
       );
     } catch (error: any) {
       console.error('Erro ao submeter check-in:', error);
-      Alert.alert(t('common.error'), error.message || 'Erro ao submeter o check-in semanal.');
+      Alert.alert(t('common.error'), error.message || t('weeklyCheckIn.submitError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -194,14 +194,14 @@ export const WeeklyCheckInModal: React.FC<WeeklyCheckInModalProps> = ({
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <View style={styles.cardHeader}>
                 <Ionicons name="scale-outline" size={20} color={colors.accent} />
-                <Text style={[styles.cardTitle, { color: colors.text }]}>Peso em Jejum (kg) *</Text>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>{t('weeklyCheckIn.fastingWeightTitle')}</Text>
               </View>
               <Text style={[styles.cardHint, { color: colors.muted }]}>
-                Pesa-te logo ao acordar, após urinar e antes de beber água.
+                {t('weeklyCheckIn.fastingWeightHint')}
               </Text>
               <TextInput
                 style={[styles.inputLarge, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface2 }]}
-                placeholder="Ex: 75.4"
+                placeholder={t('weeklyCheckIn.fastingWeightPlaceholder')}
                 placeholderTextColor={colors.muted}
                 keyboardType="numeric"
                 value={weight}
@@ -214,11 +214,11 @@ export const WeeklyCheckInModal: React.FC<WeeklyCheckInModalProps> = ({
               <View style={styles.cardHeader}>
                 <Ionicons name="restaurant-outline" size={20} color="#10B981" />
                 <Text style={[styles.cardTitle, { color: colors.text }]}>
-                  Adesão ao Plano Nutricional: {dietAdherence}/10
+                  {t('weeklyCheckIn.dietAdherenceTitle', { val: dietAdherence })}
                 </Text>
               </View>
               <Text style={[styles.cardHint, { color: colors.muted }]}>
-                1 = Não cumpri nada • 10 = Cumpri as calorias e proteína a 100%
+                {t('weeklyCheckIn.dietAdherenceHint')}
               </Text>
               {renderRatingPills(dietAdherence, setDietAdherence, 10, '#10B981')}
             </View>
@@ -228,7 +228,7 @@ export const WeeklyCheckInModal: React.FC<WeeklyCheckInModalProps> = ({
               <View style={styles.cardHeader}>
                 <Ionicons name="flash-outline" size={20} color="#F59E0B" />
                 <Text style={[styles.cardTitle, { color: colors.text }]}>
-                  Nível Médio de Energia: {energyLevel}/10
+                  {t('weeklyCheckIn.energyLevelTitle', { val: energyLevel })}
                 </Text>
               </View>
               {renderRatingPills(energyLevel, setEnergyLevel, 10, '#F59E0B')}
@@ -236,7 +236,7 @@ export const WeeklyCheckInModal: React.FC<WeeklyCheckInModalProps> = ({
               <View style={[styles.cardHeader, { marginTop: 16 }]}>
                 <Ionicons name="moon-outline" size={20} color="#8B5CF6" />
                 <Text style={[styles.cardTitle, { color: colors.text }]}>
-                  Qualidade do Sono: {sleepQuality}/10
+                  {t('weeklyCheckIn.sleepQualityTitle', { val: sleepQuality })}
                 </Text>
               </View>
               {renderRatingPills(sleepQuality, setSleepQuality, 10, '#8B5CF6')}
@@ -262,11 +262,11 @@ export const WeeklyCheckInModal: React.FC<WeeklyCheckInModalProps> = ({
                       color={hasPain ? '#EF4444' : '#10B981'}
                     />
                     <Text style={[styles.cardTitle, { color: hasPain ? '#EF4444' : colors.text }]}>
-                      Dores ou Desconforto Articular?
+                      {t('weeklyCheckIn.painTitle')}
                     </Text>
                   </View>
                   <Text style={[styles.cardHint, { color: colors.muted }]}>
-                    Assinala se sentiste dores no ombro, joelho, coluna ou tendões.
+                    {t('weeklyCheckIn.painHint')}
                   </Text>
                 </View>
 
@@ -278,7 +278,7 @@ export const WeeklyCheckInModal: React.FC<WeeklyCheckInModalProps> = ({
                   ]}
                 >
                   <Text style={{ color: hasPain ? '#FFFFFF' : colors.muted, fontWeight: '700' }}>
-                    {hasPain ? 'SIM' : 'NÃO'}
+                    {hasPain ? t('weeklyCheckIn.yes') : t('weeklyCheckIn.no')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -286,16 +286,16 @@ export const WeeklyCheckInModal: React.FC<WeeklyCheckInModalProps> = ({
               {hasPain && (
                 <View style={styles.painDetailsBox}>
                   <Text style={[styles.labelSmall, { color: colors.text }]}>
-                    Intensidade da dor: {painLevel}/10
+                    {t('weeklyCheckIn.painIntensity', { val: painLevel })}
                   </Text>
                   {renderRatingPills(painLevel, setPainLevel, 10, '#EF4444')}
 
                   <Text style={[styles.labelSmall, { color: colors.text, marginTop: 12 }]}>
-                    Localização e descrição da dor:
+                    {t('weeklyCheckIn.painDescLabel')}
                   </Text>
                   <TextInput
                     style={[styles.textArea, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface2 }]}
-                    placeholder="Ex: Senti pontadas no ombro direito ao fazer supino no treino de quarta..."
+                    placeholder={t('weeklyCheckIn.painDescPlaceholder')}
                     placeholderTextColor={colors.muted}
                     multiline
                     numberOfLines={3}
@@ -310,10 +310,10 @@ export const WeeklyCheckInModal: React.FC<WeeklyCheckInModalProps> = ({
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <View style={styles.cardHeader}>
                 <Ionicons name="camera-outline" size={20} color={colors.accent} />
-                <Text style={[styles.cardTitle, { color: colors.text }]}>Fotografias de Evolução</Text>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>{t('weeklyCheckIn.evolutionPhotosTitle')}</Text>
               </View>
               <Text style={[styles.cardHint, { color: colors.muted }]}>
-                Mesma iluminação e distância para comparar a evolução física semanal.
+                {t('weeklyCheckIn.evolutionPhotosHint')}
               </Text>
 
               <View style={styles.photosGrid}>
@@ -327,7 +327,7 @@ export const WeeklyCheckInModal: React.FC<WeeklyCheckInModalProps> = ({
                   ) : (
                     <View style={styles.photoPlaceholder}>
                       <Ionicons name="person-outline" size={28} color={colors.muted} />
-                      <Text style={[styles.photoSlotLabel, { color: colors.muted }]}>Frente</Text>
+                      <Text style={[styles.photoSlotLabel, { color: colors.muted }]}>{t('weeklyCheckIn.front')}</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -342,7 +342,7 @@ export const WeeklyCheckInModal: React.FC<WeeklyCheckInModalProps> = ({
                   ) : (
                     <View style={styles.photoPlaceholder}>
                       <Ionicons name="body-outline" size={28} color={colors.muted} />
-                      <Text style={[styles.photoSlotLabel, { color: colors.muted }]}>Costas</Text>
+                      <Text style={[styles.photoSlotLabel, { color: colors.muted }]}>{t('weeklyCheckIn.back')}</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -357,7 +357,7 @@ export const WeeklyCheckInModal: React.FC<WeeklyCheckInModalProps> = ({
                   ) : (
                     <View style={styles.photoPlaceholder}>
                       <Ionicons name="walk-outline" size={28} color={colors.muted} />
-                      <Text style={[styles.photoSlotLabel, { color: colors.muted }]}>Lateral</Text>
+                      <Text style={[styles.photoSlotLabel, { color: colors.muted }]}>{t('weeklyCheckIn.side')}</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -368,11 +368,11 @@ export const WeeklyCheckInModal: React.FC<WeeklyCheckInModalProps> = ({
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <View style={styles.cardHeader}>
                 <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.accent} />
-                <Text style={[styles.cardTitle, { color: colors.text }]}>Notas da Semana</Text>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>{t('weeklyCheckIn.weeklyNotesTitle')}</Text>
               </View>
               <TextInput
                 style={[styles.textArea, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface2 }]}
-                placeholder="Comentários sobre como correu a semana, apetite, dificuldades..."
+                placeholder={t('weeklyCheckIn.weeklyNotesPlaceholder')}
                 placeholderTextColor={colors.muted}
                 multiline
                 numberOfLines={3}
@@ -394,7 +394,7 @@ export const WeeklyCheckInModal: React.FC<WeeklyCheckInModalProps> = ({
               ) : (
                 <>
                   <Ionicons name="paper-plane-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.submitButtonText}>Submeter Check-in Semanal</Text>
+                  <Text style={styles.submitButtonText}>{t('weeklyCheckIn.submitCheckInBtn')}</Text>
                 </>
               )}
             </TouchableOpacity>

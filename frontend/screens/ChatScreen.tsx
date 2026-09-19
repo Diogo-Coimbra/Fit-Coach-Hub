@@ -12,7 +12,9 @@ import {
   ActivityIndicator,
   Modal,
   Alert,
+  Keyboard,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -72,6 +74,10 @@ export default function ChatScreen({ route, navigation }: any) {
   // Modal para pré-visualização de imagem ampliada
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
+  // Estados para Gestão de Mensagens (Copiar, Editar, Apagar)
+  const [selectedMsgForMenu, setSelectedMsgForMenu] = useState<ChatMessageItem | null>(null);
+  const [editingMessage, setEditingMessage] = useState<ChatMessageItem | null>(null);
+
   const flatListRef = useRef<FlatList>(null);
   const mediaRecorderRef = useRef<any>(null);
   const audioChunksRef = useRef<any[]>([]);
@@ -80,6 +86,21 @@ export default function ChatScreen({ route, navigation }: any) {
   const webAudioRef = useRef<any>(null);
 
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+
+  // Auto-scroll ao abrir o teclado virtual
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    );
+    return () => {
+      showSub.remove();
+    };
+  }, []);
 
   // Limpeza de áudio ao sair do ecrã
   useEffect(() => {
@@ -102,6 +123,69 @@ export default function ChatScreen({ route, navigation }: any) {
       }
     };
   }, []);
+
+  const handleCopyMessage = async (msg: ChatMessageItem) => {
+    setSelectedMsgForMenu(null);
+    if (!msg.text) return;
+    await Clipboard.setStringAsync(msg.text);
+    showAlert(t('common.success'), t('chat.messageCopied'));
+  };
+
+  const handleStartEdit = (msg: ChatMessageItem) => {
+    setSelectedMsgForMenu(null);
+    if (!msg.text) return;
+    setEditingMessage(msg);
+    setInputText(msg.text);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessage(null);
+    setInputText('');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingMessage || !inputText.trim()) return;
+    try {
+      setIsSending(true);
+      const updated = await api.patch(`/api/chat/messages/${editingMessage.id}`, {
+        text: inputText.trim(),
+      });
+      setMessages((prev) =>
+        prev.map((m) => (m.id === editingMessage.id ? { ...m, text: updated.text } : m))
+      );
+      setEditingMessage(null);
+      setInputText('');
+    } catch (err: any) {
+      console.error('Erro ao editar mensagem:', err);
+      showAlert(t('common.error'), err.message || t('common.error'));
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleDeleteMessage = (msg: ChatMessageItem) => {
+    setSelectedMsgForMenu(null);
+    const confirmDelete = async () => {
+      try {
+        await api.delete(`/api/chat/messages/${msg.id}`);
+        setMessages((prev) => prev.filter((m) => m.id !== msg.id));
+      } catch (err: any) {
+        console.error('Erro ao apagar mensagem:', err);
+        showAlert(t('common.error'), err.message || t('common.error'));
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(t('chat.deletePrompt'))) {
+        confirmDelete();
+      }
+    } else {
+      Alert.alert(t('chat.deleteMessage'), t('chat.deletePrompt'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('chat.deleteConfirm'), style: 'destructive', onPress: confirmDelete },
+      ]);
+    }
+  };
 
   // Carregar mensagens
   const fetchMessages = async (silent = false) => {
@@ -438,7 +522,10 @@ export default function ChatScreen({ route, navigation }: any) {
           isMe ? styles.messageRowMe : styles.messageRowOther,
         ]}
       >
-        <View
+        <TouchableOpacity
+          activeOpacity={0.88}
+          onLongPress={() => setSelectedMsgForMenu(item)}
+          delayLongPress={300}
           style={[
             styles.messageBubble,
             isMe
@@ -472,7 +559,7 @@ export default function ChatScreen({ route, navigation }: any) {
                 if (Platform.OS === 'web') {
                   window.open(item.mediaUrl!, '_blank');
                 } else {
-                  showAlert('Vídeo de Execução', `Vídeo disponível em:\n${item.mediaUrl}`);
+                  showAlert(t('chat.videoTitle'), `${item.mediaUrl}`);
                 }
               }}
             >
@@ -481,10 +568,10 @@ export default function ChatScreen({ route, navigation }: any) {
               </View>
               <View style={{ flex: 1, marginLeft: 10 }}>
                 <Text style={[styles.videoTitle, { color: isMe ? '#FFF' : colors.text }]}>
-                  🎥 Vídeo de Execução Técnica
+                  🎥 {t('chat.videoTitle')}
                 </Text>
                 <Text style={[styles.videoSub, { color: isMe ? 'rgba(255,255,255,0.7)' : colors.muted }]}>
-                  Clica para reproduzir
+                  {t('chat.tapToPlay')}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -505,10 +592,10 @@ export default function ChatScreen({ route, navigation }: any) {
               </TouchableOpacity>
               <View style={{ flex: 1, marginLeft: 8 }}>
                 <Text style={[styles.audioTitle, { color: isMe ? '#FFF' : colors.text }]}>
-                  {playingMsgId === item.id ? '▶️ A reproduzir nota de áudio...' : '🎙️ Nota de Áudio'}
+                  {playingMsgId === item.id ? `▶️ ${t('chat.playingAudio')}` : `🎙️ ${t('chat.voiceNote')}`}
                 </Text>
                 <Text style={[styles.audioWave, { color: isMe ? 'rgba(255,255,255,0.7)' : colors.muted }]}>
-                  {playingMsgId === item.id ? 'ılılılılılıl' : '••• ılıılılı Nota de voz'}
+                  {playingMsgId === item.id ? 'ılılılılılıl' : '••• ılıılılı'}
                 </Text>
               </View>
             </View>
@@ -545,7 +632,7 @@ export default function ChatScreen({ route, navigation }: any) {
               />
             )}
           </View>
-        </View>
+        </TouchableOpacity>
       </View>
     );
   };
@@ -599,14 +686,31 @@ export default function ChatScreen({ route, navigation }: any) {
               <View style={styles.emptyBox}>
                 <Ionicons name="chatbubbles-outline" size={48} color={colors.muted} />
                 <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                  Canal Privado 1-a-1
+                  {t('chat.privateChannel')}
                 </Text>
                 <Text style={[styles.emptySubtitle, { color: colors.muted }]}>
-                  Este canal é exclusivo e encriptado entre ti e {targetUserName}. Podes tirar dúvidas, enviar notas de áudio ou vídeos da execução de exercícios.
+                  {t('chat.channelDescription', { name: targetUserName })}
                 </Text>
               </View>
             }
           />
+        )}
+
+        {/* Barra de Edição Ativa */}
+        {editingMessage && (
+          <View style={[styles.editingBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.editingLabel, { color: colors.accent }]}>
+                {t('chat.editing')}
+              </Text>
+              <Text style={[styles.editingPreview, { color: colors.muted }]} numberOfLines={1}>
+                {editingMessage.text}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={handleCancelEdit} style={{ padding: 6 }}>
+              <Ionicons name="close" size={20} color={colors.muted} />
+            </TouchableOpacity>
+          </View>
         )}
 
         {/* Painel de Gravação de Áudio Ativa */}
@@ -615,7 +719,7 @@ export default function ChatScreen({ route, navigation }: any) {
             <View style={styles.recordingPulse}>
               <View style={styles.redDot} />
               <Text style={[styles.recordingText, { color: colors.text }]}>
-                A gravar áudio... {recordingSeconds}s
+                {t('chat.recordingAudio')} {recordingSeconds}s
               </Text>
             </View>
             <View style={styles.recordingActions}>
@@ -634,7 +738,7 @@ export default function ChatScreen({ route, navigation }: any) {
             <TouchableOpacity
               style={styles.iconBtn}
               onPress={() => handlePickMedia('images')}
-              disabled={isSending}
+              disabled={isSending || !!editingMessage}
             >
               <Ionicons name="image-outline" size={22} color={colors.muted} />
             </TouchableOpacity>
@@ -643,7 +747,7 @@ export default function ChatScreen({ route, navigation }: any) {
             <TouchableOpacity
               style={styles.iconBtn}
               onPress={() => handlePickMedia('videos')}
-              disabled={isSending}
+              disabled={isSending || !!editingMessage}
             >
               <Ionicons name="videocam-outline" size={22} color={colors.muted} />
             </TouchableOpacity>
@@ -654,11 +758,11 @@ export default function ChatScreen({ route, navigation }: any) {
                 styles.textInput,
                 {
                   backgroundColor: colors.bg,
-                  borderColor: colors.border,
+                  borderColor: editingMessage ? colors.accent : colors.border,
                   color: colors.text,
                 },
               ]}
-              placeholder="Escreve uma mensagem..."
+              placeholder={t('chat.typeMessage')}
               placeholderTextColor={colors.muted}
               multiline
               value={inputText}
@@ -666,8 +770,20 @@ export default function ChatScreen({ route, navigation }: any) {
               maxLength={1500}
             />
 
-            {/* Botão de Gravar Áudio ou Botão de Enviar */}
-            {inputText.trim().length > 0 ? (
+            {/* Botão de Enviar ou Botão de Gravar Áudio */}
+            {editingMessage ? (
+              <TouchableOpacity
+                style={[styles.sendBtn, { backgroundColor: colors.accent }]}
+                onPress={handleSaveEdit}
+                disabled={isSending || !inputText.trim()}
+              >
+                {isSending ? (
+                  <ActivityIndicator size="small" color={colors.bg} />
+                ) : (
+                  <Ionicons name="checkmark" size={20} color={colors.bg} />
+                )}
+              </TouchableOpacity>
+            ) : inputText.trim().length > 0 ? (
               <TouchableOpacity
                 style={[styles.sendBtn, { backgroundColor: colors.accent }]}
                 onPress={() => handleSendMessage(inputText)}
@@ -691,6 +807,77 @@ export default function ChatScreen({ route, navigation }: any) {
           </View>
         )}
       </KeyboardAvoidingView>
+
+      {/* Modal de Menu de Contexto da Mensagem (Long Press) */}
+      <Modal
+        visible={!!selectedMsgForMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedMsgForMenu(null)}
+      >
+        <TouchableOpacity
+          style={styles.actionSheetBackdrop}
+          activeOpacity={1}
+          onPress={() => setSelectedMsgForMenu(null)}
+        >
+          <View style={[styles.actionSheetCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.actionSheetHeader}>
+              <Text style={[styles.actionSheetPreview, { color: colors.muted }]} numberOfLines={2}>
+                {selectedMsgForMenu?.text || (selectedMsgForMenu?.mediaType ? `[${selectedMsgForMenu.mediaType}]` : '')}
+              </Text>
+            </View>
+
+            {/* Copiar Texto */}
+            {!!selectedMsgForMenu?.text && (
+              <TouchableOpacity
+                style={[styles.actionSheetBtn, { borderBottomColor: colors.border }]}
+                onPress={() => selectedMsgForMenu && handleCopyMessage(selectedMsgForMenu)}
+              >
+                <Ionicons name="copy-outline" size={20} color={colors.text} />
+                <Text style={[styles.actionSheetBtnText, { color: colors.text }]}>
+                  {t('chat.copy')}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Editar Mensagem (se for o autor e texto) */}
+            {selectedMsgForMenu?.senderId === user?.id && !!selectedMsgForMenu?.text && (
+              <TouchableOpacity
+                style={[styles.actionSheetBtn, { borderBottomColor: colors.border }]}
+                onPress={() => selectedMsgForMenu && handleStartEdit(selectedMsgForMenu)}
+              >
+                <Ionicons name="pencil-outline" size={20} color={colors.accent} />
+                <Text style={[styles.actionSheetBtnText, { color: colors.accent }]}>
+                  {t('chat.edit')}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Apagar Mensagem (se for o autor ou PT) */}
+            {(selectedMsgForMenu?.senderId === user?.id || user?.role === 'COACH') && (
+              <TouchableOpacity
+                style={[styles.actionSheetBtn, { borderBottomColor: colors.border }]}
+                onPress={() => selectedMsgForMenu && handleDeleteMessage(selectedMsgForMenu)}
+              >
+                <Ionicons name="trash-outline" size={20} color={colors.danger} />
+                <Text style={[styles.actionSheetBtnText, { color: colors.danger }]}>
+                  {t('chat.delete')}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Cancelar */}
+            <TouchableOpacity
+              style={styles.actionSheetCancelBtn}
+              onPress={() => setSelectedMsgForMenu(null)}
+            >
+              <Text style={[styles.actionSheetCancelText, { color: colors.muted }]}>
+                {t('common.cancel')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Modal de Zoom de Imagem */}
       <Modal visible={!!previewImage} transparent animationType="fade" onRequestClose={() => setPreviewImage(null)}>
@@ -955,5 +1142,65 @@ const styles = StyleSheet.create({
   fullImage: {
     width: '95%',
     height: '80%',
+  },
+  editingBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: space.md,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+  },
+  editingLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  editingPreview: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  actionSheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+    padding: space.md,
+  },
+  actionSheetCard: {
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    padding: space.sm,
+    overflow: 'hidden',
+  },
+  actionSheetHeader: {
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  actionSheetPreview: {
+    fontSize: 13,
+    fontStyle: 'italic',
+  },
+  actionSheetBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: space.md,
+    borderBottomWidth: 1,
+  },
+  actionSheetBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  actionSheetCancelBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    marginTop: 4,
+  },
+  actionSheetCancelText: {
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

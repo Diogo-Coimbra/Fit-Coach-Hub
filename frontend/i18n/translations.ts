@@ -30,6 +30,29 @@ export interface Translations {
     devSectionTitle: string;
     devCoachBtn: string;
     devClientBtn: string;
+    nameLabel: string;
+    namePlaceholder: string;
+    emailLabel: string;
+    emailPlaceholder: string;
+    passwordLabel: string;
+    passwordPlaceholder: string;
+    confirmPassword: string;
+    confirmPasswordPlaceholder: string;
+    loginTab: string;
+    registerTab: string;
+    loginBtn: string;
+    registerBtn: string;
+    orContinueWith: string;
+    forgotPassword: string;
+    forgotTitle: string;
+    forgotSubtitle: string;
+    sendCode: string;
+    codeStepSubtitle: string;
+    codePlaceholder: string;
+    saveNewPassword: string;
+    backToEmail: string;
+    termsNotice: string;
+    termsAndPrivacyLink: string;
   };
   dashboard: {
     hello: string;
@@ -303,6 +326,11 @@ export interface Translations {
     devTrialExpired: string;
     stripePortal: string;
     saveChanges: string;
+    termsAndPrivacyBtn: string;
+    accountAndPrivacy: string;
+    deleteAccountBtn: string;
+    deleteAccountTitle: string;
+    deleteAccountMsg: string;
   };
   clientDetails: {
     studentFile: string;
@@ -441,6 +469,90 @@ export interface Translations {
     cableAltTag: string;
     machineAltTag: string;
   };
+  privacyTerms: {
+    badgeText: string;
+    sec1Title: string;
+    sec1Text: string;
+    sec2Title: string;
+    sec2Text: string;
+    sec2Bullet1: string;
+    sec2Bullet2: string;
+    sec2Bullet3: string;
+    sec3Title: string;
+    sec3Text: string;
+    sec4Title: string;
+    sec4Text: string;
+    sec4Bullet1: string;
+    sec4Bullet2: string;
+    sec4Bullet3: string;
+    sec5Title: string;
+    sec5Text: string;
+    sec5Bullet1: string;
+    sec5Bullet2: string;
+    sec5Bullet3: string;
+    sec6Title: string;
+    sec6Text: string;
+    sec6Subtext: string;
+    sec7Title: string;
+    sec7Text: string;
+    agreeBtn: string;
+  };
+  weeklyCheckIn: {
+    dietAdherenceTitle: string;
+    dietAdherenceHint: string;
+    energyLevelTitle: string;
+    sleepQualityTitle: string;
+    painTitle: string;
+    painHint: string;
+    yes: string;
+    no: string;
+    painIntensity: string;
+    painDescLabel: string;
+    painDescPlaceholder: string;
+    evolutionPhotosTitle: string;
+    evolutionPhotosHint: string;
+    front: string;
+    back: string;
+    side: string;
+    weeklyNotesTitle: string;
+    weeklyNotesPlaceholder: string;
+    submitCheckInBtn: string;
+  };
+  cardio: {
+    isCardio: string;
+    durationMinutes: string;
+    durationPlaceholder: string;
+    intensity: string;
+    intensityPlaceholder: string;
+    intensityMod: string;
+    intensityLow: string;
+    intensityHigh: string;
+    intensityHiit: string;
+    prescribedBadge: string;
+    minutesUnit: string;
+    completedDuration: string;
+    perceivedIntensity: string;
+    completedBadge: string;
+    completedBtn: string;
+  };
+  chat: {
+    copy: string;
+    edit: string;
+    delete: string;
+    deleteMessage: string;
+    deletePrompt: string;
+    deleteConfirm: string;
+    editing: string;
+    messageCopied: string;
+    privateChannel: string;
+    channelDescription: string;
+    typeMessage: string;
+    recordingAudio: string;
+    videoTitle: string;
+    tapToPlay: string;
+    voiceNote: string;
+    playingAudio: string;
+  };
 }
 
 export const translations: Record<Language, Translations> = {
@@ -474,6 +586,29 @@ export const translations: Record<Language, Translations> = {
       devSectionTitle: 'Modo de Teste Rápido (Sem Google)',
       devCoachBtn: 'Entrar como Treinador (PT)',
       devClientBtn: 'Entrar como Aluno (Cliente)',
+      nameLabel: 'Nome Completo',
+      namePlaceholder: 'O teu nome',
+      emailLabel: 'Email',
+      emailPlaceholder: 'teu.email@exemplo.com',
+      passwordLabel: 'Palavra-passe',
+      passwordPlaceholder: 'Mínimo 6 caracteres',
+      confirmPassword: 'Confirmar Palavra-passe',
+      confirmPasswordPlaceholder: 'Repete a tua palavra-passe',
+      loginTab: 'Iniciar Sessão',
+      registerTab: 'Registar',
+      loginBtn: 'Entrar na Conta',
+      registerBtn: 'Criar Conta Gratuita',
+      orContinueWith: 'ou continua com',
+      forgotPassword: 'Esqueci-me da palavra-passe',
+      forgotTitle: 'Recuperar Palavra-passe',
+      forgotSubtitle: 'Introduz o email associado à tua conta para receberes um código de verificação de 6 dígitos.',
+      sendCode: 'Enviar Código de Recuperação',
+      codeStepSubtitle: 'Introduz o código de 6 dígitos enviado para',
+      codePlaceholder: 'Código de 6 dígitos (Ex: 123456)',
+      saveNewPassword: 'Redefinir Palavra-passe',
+      backToEmail: '← Voltar e alterar email',
+      termsNotice: 'Ao continuar, declaras que concordas com os nossos',
+      termsAndPrivacyLink: 'Termos de Uso e Política de Privacidade',
     },
     dashboard: {
       hello: 'Olá',
@@ -747,6 +882,11 @@ export const translations: Record<Language, Translations> = {
       devTrialExpired: 'Período experimental expirado. Todas as funcionalidades de treinador estão agora bloqueadas pela paywall.',
       stripePortal: 'Portal Stripe',
       saveChanges: 'Guardar Alterações',
+      termsAndPrivacyBtn: 'Termos de Uso & Política de Privacidade (RGPD)',
+      accountAndPrivacy: 'Gestão de Conta & Privacidade',
+      deleteAccountBtn: 'Eliminar a Minha Conta',
+      deleteAccountTitle: 'Eliminar Conta Permanentemente',
+      deleteAccountMsg: 'Tens a certeza absoluta que pretendes eliminar a tua conta? Esta ação é irreversível e apagará definitivamente todos os teus treinos, check-ins, fotos de evolução e mensagens.',
     },
     clientDetails: {
       studentFile: 'Ficha do Aluno',
@@ -885,6 +1025,90 @@ export const translations: Record<Language, Translations> = {
       cableAltTag: 'Em Cabos',
       machineAltTag: 'Em Máquina',
     },
+    privacyTerms: {
+      badgeText: 'Atualizado em Setembro de 2026 · Conforme com RGPD & App Store',
+      sec1Title: '1. Objeto e Âmbito da Aplicação',
+      sec1Text: 'A presente plataforma tem como objetivo proporcionar a Personal Trainers e respetivos alunos um ambiente digital para prescrição de treinos, monitorização de cargas, registo nutricional, check-ins de evolução corporal e comunicação direta. Ao utilizar a aplicação, o utilizador declara aceitar os presentes Termos de Uso.',
+      sec2Title: '2. Recolha e Finalidade de Dados Pessoais',
+      sec2Text: 'Para garantir o correto funcionamento do serviço, recolhemos os seguintes dados:',
+      sec2Bullet1: 'Dados de Registo: Nome, endereço de email e palavra-passe encriptada (ou identificador único autenticado via Google).',
+      sec2Bullet2: 'Dados Fisiológicos e de Saúde: Peso corporal, percentagem de massa gorda, registo de treinos efetuados, feedback de fadiga (RPE) e eventuais indicações de dor ou desconforto articular reportadas voluntariamente.',
+      sec2Bullet3: 'Fotografias de Evolução Corporal: Fotos enviadas nos check-ins semanais (frente, costas, perfil) com a finalidade exclusiva de avaliação técnica comparativa ("Antes & Depois") pelo treinador atribuído.',
+      sec3Title: '3. Confidencialidade e Isolamento dos Dados',
+      sec3Text: 'Todos os dados de saúde, registos de treino, fotografias e mensagens trocadas no chat são estritamente confidenciais e isolados. Nenhum aluno tem acesso a dados de outros alunos. O acesso aos dados do aluno está estritamente restrito ao Personal Trainer com quem o aluno estabeleceu uma ligação consented por código de convite.',
+      sec4Title: '4. Segurança e Armazenamento',
+      sec4Text: 'Adotamos medidas técnicas robustas de salvaguarda:',
+      sec4Bullet1: 'Palavras-passe encriptadas unidirecionalmente com o algoritmo BCrypt com salt hashing.',
+      sec4Bullet2: 'Sessões autenticadas através de JSON Web Tokens (JWT) seguros e comunicação protegida por protocolo HTTPS/SSL.',
+      sec4Bullet3: 'Processamento de pagamentos efetuado integralmente através da plataforma Stripe, sem que quaisquer dados de cartão de crédito passem pelos nossos servidores.',
+      sec5Title: '5. Direitos do Titular dos Dados (RGPD / GDPR)',
+      sec5Text: 'Ao abrigo do Regulamento Geral sobre a Proteção de Dados (RGPD), o utilizador tem o direito de:',
+      sec5Bullet1: 'Aceder, consultar e atualizar os seus dados a qualquer momento no ecrã de Perfil.',
+      sec5Bullet2: 'Exportar relatórios em formato PDF com as suas métricas e fotografias.',
+      sec5Bullet3: 'Solicitar a remoção ou revogação de consentimento de acesso ao treinador.',
+      sec6Title: '6. Direito ao Esquecimento e Eliminação de Conta (Diretriz Apple 5.1.1)',
+      sec6Text: 'Em estrito cumprimento das diretrizes de privacidade internacionais e da Apple App Store (Diretriz 5.1.1(v)), o utilizador tem a faculdade de eliminar permanentemente a sua conta diretamente dentro da aplicação através do botão "Eliminar Conta" disponível nas definições do seu Perfil.',
+      sec6Subtext: 'A eliminação da conta é imediata, irreversível e remove em cascata todos os treinos, registos de séries, diários de refeições, check-ins, fotografias de evolução, ficheiros de áudio e histórico de conversas dos nossos servidores.',
+      sec7Title: '7. Contacto e Suporte',
+      sec7Text: 'Para qualquer esclarecimento, exercício dos seus direitos de privacidade ou suporte técnico, poderá contactar a equipa através do endereço: suporte@fit-ai.app.',
+      agreeBtn: 'Compreendi e Concordo',
+    },
+    weeklyCheckIn: {
+      dietAdherenceTitle: 'Adesão ao Plano Nutricional: {val}/10',
+      dietAdherenceHint: '1 = Não cumpri nada • 10 = Cumpri as calorias e proteína a 100%',
+      energyLevelTitle: 'Nível Médio de Energia: {val}/10',
+      sleepQualityTitle: 'Qualidade do Sono: {val}/10',
+      painTitle: 'Dores ou Desconforto Articular?',
+      painHint: 'Assinala se sentiste dores no ombro, joelho, coluna ou tendões.',
+      yes: 'SIM',
+      no: 'NÃO',
+      painIntensity: 'Intensidade da dor: {val}/10',
+      painDescLabel: 'Localização e descrição da dor:',
+      painDescPlaceholder: 'Ex: Senti pontadas no ombro direito ao fazer supino no treino de quarta...',
+      evolutionPhotosTitle: 'Fotografias de Evolução',
+      evolutionPhotosHint: 'Mesma iluminação e distância para comparar a evolução física semanal.',
+      front: 'Frente',
+      back: 'Costas',
+      side: 'Lateral',
+      weeklyNotesTitle: 'Notas da Semana',
+      weeklyNotesPlaceholder: 'Comentários sobre como correu a semana, apetite, dificuldades...',
+      submitCheckInBtn: 'Submeter Check-in Semanal',
+    },
+    cardio: {
+      isCardio: 'Cardio',
+      durationMinutes: 'Duração (Minutos)',
+      durationPlaceholder: 'Ex: 20',
+      intensity: 'Intensidade / Nível',
+      intensityPlaceholder: 'Ex: Moderada, Ritmo Constante',
+      intensityMod: 'Moderada',
+      intensityLow: 'Baixa / Regenerativa',
+      intensityHigh: 'Alta',
+      intensityHiit: 'HIIT / Intervalada',
+      prescribedBadge: 'Cardio Prescrito',
+      minutesUnit: 'min',
+      completedDuration: 'Duração Feita (min)',
+      perceivedIntensity: 'Intensidade Sentida',
+      completedBadge: 'Concluído',
+      completedBtn: 'Marcar Feito',
+    },
+    chat: {
+      copy: 'Copiar Mensagem',
+      edit: 'Editar Mensagem',
+      delete: 'Apagar Mensagem',
+      deleteMessage: 'Apagar Mensagem',
+      deletePrompt: 'Tens a certeza que pretendes apagar esta mensagem para ambos os utilizadores?',
+      deleteConfirm: 'Apagar',
+      editing: 'A editar mensagem',
+      messageCopied: 'Mensagem copiada para a área de transferência!',
+      privateChannel: 'Canal Privado 1-a-1',
+      channelDescription: 'Este canal é exclusivo e encriptado entre ti e {name}. Podes tirar dúvidas, enviar notas de áudio ou vídeos da execução de exercícios.',
+      typeMessage: 'Escreve uma mensagem...',
+      recordingAudio: 'A gravar áudio...',
+      videoTitle: 'Vídeo de Execução Técnica',
+      tapToPlay: 'Clica para reproduzir',
+      voiceNote: 'Nota de Áudio',
+      playingAudio: 'A reproduzir nota de áudio...',
+    },
   },
 
   en: {
@@ -917,6 +1141,29 @@ export const translations: Record<Language, Translations> = {
       devSectionTitle: 'Quick Test Mode (Without Google)',
       devCoachBtn: 'Sign in as Coach (PT)',
       devClientBtn: 'Sign in as Client',
+      nameLabel: 'Full Name',
+      namePlaceholder: 'Your name',
+      emailLabel: 'Email',
+      emailPlaceholder: 'your.email@example.com',
+      passwordLabel: 'Password',
+      passwordPlaceholder: 'Minimum 6 characters',
+      confirmPassword: 'Confirm Password',
+      confirmPasswordPlaceholder: 'Repeat your password',
+      loginTab: 'Sign In',
+      registerTab: 'Sign Up',
+      loginBtn: 'Sign In to Account',
+      registerBtn: 'Create Free Account',
+      orContinueWith: 'or continue with',
+      forgotPassword: 'Forgot password?',
+      forgotTitle: 'Recover Password',
+      forgotSubtitle: 'Enter the email associated with your account to receive a 6-digit verification code.',
+      sendCode: 'Send Recovery Code',
+      codeStepSubtitle: 'Enter the 6-digit code sent to',
+      codePlaceholder: '6-digit code (e.g. 123456)',
+      saveNewPassword: 'Reset Password',
+      backToEmail: '← Back to change email',
+      termsNotice: 'By continuing, you agree to our',
+      termsAndPrivacyLink: 'Terms of Use and Privacy Policy',
     },
     dashboard: {
       hello: 'Hello',
@@ -1190,6 +1437,11 @@ export const translations: Record<Language, Translations> = {
       devTrialExpired: 'Trial period expired. All coach features are now paywall protected.',
       stripePortal: 'Stripe Portal',
       saveChanges: 'Save Changes',
+      termsAndPrivacyBtn: 'Terms of Service & Privacy Policy (GDPR)',
+      accountAndPrivacy: 'Account Management & Privacy',
+      deleteAccountBtn: 'Delete My Account',
+      deleteAccountTitle: 'Permanently Delete Account',
+      deleteAccountMsg: 'Are you absolutely sure you want to delete your account? This action is irreversible and will permanently erase all your workouts, check-ins, evolution photos, and messages.',
     },
     clientDetails: {
       studentFile: 'Student File',
@@ -1328,6 +1580,90 @@ export const translations: Record<Language, Translations> = {
       cableAltTag: 'Cables',
       machineAltTag: 'Machine',
     },
+    privacyTerms: {
+      badgeText: 'Updated September 2026 · Compliant with GDPR & App Store',
+      sec1Title: '1. Purpose and Scope of Application',
+      sec1Text: 'This platform aims to provide Personal Trainers and their trainees with a digital environment for workout prescription, load tracking, nutritional logs, physical evolution check-ins, and direct messaging. By using the app, the user agrees to these Terms of Use.',
+      sec2Title: '2. Collection and Purpose of Personal Data',
+      sec2Text: 'To ensure proper service delivery, we collect the following data:',
+      sec2Bullet1: 'Registration Data: Name, email address, and encrypted password (or unique identifier authenticated via Google).',
+      sec2Bullet2: 'Physiological and Health Data: Body weight, body fat percentage, completed workout logs, perceived exertion (RPE), and voluntary reports of joint discomfort or pain.',
+      sec2Bullet3: 'Body Evolution Photographs: Weekly check-in photos (front, back, side) exclusively for comparative technical evaluation ("Before & After") by the assigned trainer.',
+      sec3Title: '3. Confidentiality and Data Isolation',
+      sec3Text: 'All health data, training logs, photos, and chat messages are strictly confidential and isolated. No student has access to another student\'s data. Trainee data access is strictly restricted to the assigned Personal Trainer linked via invitation code.',
+      sec4Title: '4. Security and Storage',
+      sec4Text: 'We apply robust technical safeguards:',
+      sec4Bullet1: 'One-way encrypted passwords using BCrypt algorithm with salt hashing.',
+      sec4Bullet2: 'Authenticated sessions via secure JSON Web Tokens (JWT) and HTTPS/SSL encryption.',
+      sec4Bullet3: 'Payment processing exclusively handled by Stripe; no credit card data ever touches our servers.',
+      sec5Title: '5. Rights of the Data Subject (GDPR)',
+      sec5Text: 'Under the General Data Protection Regulation (GDPR), users have the right to:',
+      sec5Bullet1: 'Access, review, and update their personal information anytime on the Profile screen.',
+      sec5Bullet2: 'Export PDF reports with their historical metrics and progress pictures.',
+      sec5Bullet3: 'Request removal or revocation of trainer access consent at any time.',
+      sec6Title: '6. Right to Erasure and Account Deletion (Apple Guideline 5.1.1)',
+      sec6Text: 'In strict compliance with international privacy standards and Apple App Store Guideline 5.1.1(v), users can permanently delete their account directly within the app using the "Delete Account" button in their Profile settings.',
+      sec6Subtext: 'Account deletion is immediate, permanent, and cascades to erase all workouts, sets, meal logs, check-ins, progress photos, audio messages, and chat history from our servers.',
+      sec7Title: '7. Contact and Support',
+      sec7Text: 'For questions, privacy rights enforcement, or technical assistance, contact our team at: support@fit-ai.app.',
+      agreeBtn: 'I Understand and Agree',
+    },
+    weeklyCheckIn: {
+      dietAdherenceTitle: 'Diet Adherence: {val}/10',
+      dietAdherenceHint: '1 = Did not follow • 10 = Followed calories and protein 100%',
+      energyLevelTitle: 'Average Energy Level: {val}/10',
+      sleepQualityTitle: 'Sleep Quality: {val}/10',
+      painTitle: 'Joint Pain or Discomfort?',
+      painHint: 'Indicate if you experienced pain in shoulders, knees, lower back, or tendons.',
+      yes: 'YES',
+      no: 'NO',
+      painIntensity: 'Pain intensity: {val}/10',
+      painDescLabel: 'Location and description of pain:',
+      painDescPlaceholder: 'E.g.: Felt twinges in right shoulder during bench press on Wednesday...',
+      evolutionPhotosTitle: 'Progress Photos',
+      evolutionPhotosHint: 'Use consistent lighting and distance to compare weekly physical changes.',
+      front: 'Front',
+      back: 'Back',
+      side: 'Side',
+      weeklyNotesTitle: 'Weekly Notes',
+      weeklyNotesPlaceholder: 'Comments on how the week went, energy, appetite, challenges...',
+      submitCheckInBtn: 'Submit Weekly Check-in',
+    },
+    cardio: {
+      isCardio: 'Cardio',
+      durationMinutes: 'Duration (Minutes)',
+      durationPlaceholder: 'E.g.: 20',
+      intensity: 'Intensity / Level',
+      intensityPlaceholder: 'E.g.: Moderate, Steady State',
+      intensityMod: 'Moderate',
+      intensityLow: 'Low / Recovery',
+      intensityHigh: 'High',
+      intensityHiit: 'HIIT / Intervals',
+      prescribedBadge: 'Prescribed Cardio',
+      minutesUnit: 'min',
+      completedDuration: 'Duration Done (min)',
+      perceivedIntensity: 'Perceived Intensity',
+      completedBadge: 'Done',
+      completedBtn: 'Mark as Done',
+    },
+    chat: {
+      copy: 'Copy Message',
+      edit: 'Edit Message',
+      delete: 'Delete Message',
+      deleteMessage: 'Delete Message',
+      deletePrompt: 'Are you sure you want to delete this message for both participants?',
+      deleteConfirm: 'Delete',
+      editing: 'Editing message',
+      messageCopied: 'Message copied to clipboard!',
+      privateChannel: 'Private 1-on-1 Channel',
+      channelDescription: 'This channel is direct and private between you and {name}. You can ask questions, send voice notes, or share technique execution videos.',
+      typeMessage: 'Type a message...',
+      recordingAudio: 'Recording audio...',
+      videoTitle: 'Technique Video',
+      tapToPlay: 'Tap to play',
+      voiceNote: 'Voice Note',
+      playingAudio: 'Playing audio note...',
+    },
   },
 
   es: {
@@ -1360,6 +1696,29 @@ export const translations: Record<Language, Translations> = {
       devSectionTitle: 'Modo de Prueba Rápida (Sin Google)',
       devCoachBtn: 'Entrar como Entrenador (PT)',
       devClientBtn: 'Entrar como Alumno (Cliente)',
+      nameLabel: 'Nombre Completo',
+      namePlaceholder: 'Tu nombre',
+      emailLabel: 'Correo Electrónico',
+      emailPlaceholder: 'tu.correo@ejemplo.com',
+      passwordLabel: 'Contraseña',
+      passwordPlaceholder: 'Mínimo 6 caracteres',
+      confirmPassword: 'Confirmar Contraseña',
+      confirmPasswordPlaceholder: 'Repite tu contraseña',
+      loginTab: 'Iniciar Sesión',
+      registerTab: 'Registrarse',
+      loginBtn: 'Entrar a la Cuenta',
+      registerBtn: 'Crear Cuenta Gratuita',
+      orContinueWith: 'o continuar con',
+      forgotPassword: '¿Olvidaste tu contraseña?',
+      forgotTitle: 'Recuperar Contraseña',
+      forgotSubtitle: 'Introduce el correo asociado a tu cuenta para recibir un código de verificación de 6 dígitos.',
+      sendCode: 'Enviar Código de Recuperación',
+      codeStepSubtitle: 'Introduce el código de 6 dígitos enviado a',
+      codePlaceholder: 'Código de 6 dígitos (Ej: 123456)',
+      saveNewPassword: 'Restablecer Contraseña',
+      backToEmail: '← Volver y cambiar correo',
+      termsNotice: 'Al continuar, declaras aceptar nuestros',
+      termsAndPrivacyLink: 'Términos de Uso y Política de Privacidad',
     },
     dashboard: {
       hello: 'Hola',
@@ -1633,6 +1992,11 @@ export const translations: Record<Language, Translations> = {
       devTrialExpired: 'Período de prueba expirado. Todas las funciones de entrenador están ahora bloqueadas.',
       stripePortal: 'Portal Stripe',
       saveChanges: 'Guardar Cambios',
+      termsAndPrivacyBtn: 'Términos de Uso y Política de Privacidad (RGPD)',
+      accountAndPrivacy: 'Gestión de Cuenta y Privacidad',
+      deleteAccountBtn: 'Eliminar Mi Cuenta',
+      deleteAccountTitle: 'Eliminar Cuenta Permanentemente',
+      deleteAccountMsg: '¿Estás completamente seguro de que deseas eliminar tu cuenta? Esta acción es irreversible y borrará para siempre todos tus entrenamientos, check-ins, fotos de evolución y mensajes.',
     },
     clientDetails: {
       studentFile: 'Ficha del Alumno',
@@ -1771,6 +2135,90 @@ export const translations: Record<Language, Translations> = {
       cableAltTag: 'En Poleas',
       machineAltTag: 'En Máquina',
     },
+    privacyTerms: {
+      badgeText: 'Actualizado en Septiembre de 2026 · Conforme a RGPD y App Store',
+      sec1Title: '1. Objeto y Ámbito de Aplicación',
+      sec1Text: 'Esta plataforma tiene por objeto proporcionar a Entrenadores Personales y alumnos un entorno digital para prescripción de rutinas, registro de cargas, nutrición, check-ins corporales y mensajería directa. Al usar la app, el usuario acepta estos Términos de Uso.',
+      sec2Title: '2. Recogida y Finalidad de los Datos Personales',
+      sec2Text: 'Para garantizar el correcto funcionamiento del servicio, recogemos los siguientes datos:',
+      sec2Bullet1: 'Datos de Registro: Nombre, dirección de correo y contraseña encriptada (o identificador único autenticado vía Google).',
+      sec2Bullet2: 'Datos Fisiológicos y de Salud: Peso corporal, porcentaje de grasa, entrenamientos realizados, esfuerzo percibido (RPE) y posibles molestias articulares declaradas voluntariamente.',
+      sec2Bullet3: 'Fotografías de Evolución Corporal: Fotos enviadas en check-ins semanales (frontal, dorsal, perfil) destinadas exclusivamente a la evaluación comparativa ("Antes y Después") por el entrenador.',
+      sec3Title: '3. Confidencialidad y Aislamiento de los Datos',
+      sec3Text: 'Todos los datos de salud, entrenamientos, fotos y mensajes son estrictamente confidenciales y aislados. Ningún alumno tiene acceso a datos de otros. El acceso está restringido al Entrenador Personal vinculado por código de invitación.',
+      sec4Title: '4. Seguridad y Almacenamiento',
+      sec4Text: 'Adoptamos medidas técnicas rigurosas de seguridad:',
+      sec4Bullet1: 'Contraseñas encriptadas mediante algoritmo unidireccional BCrypt con salt hashing.',
+      sec4Bullet2: 'Sesiones autenticadas mediante tokens JWT seguros y comunicaciones protegidas por HTTPS/SSL.',
+      sec4Bullet3: 'Procesamiento de pagos realizado íntegramente por Stripe; ningún dato bancario toca nuestros servidores.',
+      sec5Title: '5. Derechos del Usuario (RGPD / GDPR)',
+      sec5Text: 'Conforme al Reglamento General de Protección de Datos (RGPD), el usuario tiene derecho a:',
+      sec5Bullet1: 'Acceder, consultar y actualizar sus datos en cualquier momento en su Perfil.',
+      sec5Bullet2: 'Exportar informes en formato PDF con su historial y fotografías de evolución.',
+      sec5Bullet3: 'Solicitar la eliminación o revocar el consentimiento de acceso de su entrenador.',
+      sec6Title: '6. Derecho al Olvido y Eliminación de Cuenta (Directriz Apple 5.1.1)',
+      sec6Text: 'En estricto cumplimiento de los estándares internacionales y de la directriz 5.1.1(v) de Apple App Store, el usuario puede eliminar permanentemente su cuenta dentro de la app pulsando "Eliminar Mi Cuenta" en los ajustes de su Perfil.',
+      sec6Subtext: 'La eliminación es inmediata, irreversible y borra en cascada todos los entrenamientos, series, comidas, check-ins, fotos de evolución, notas de voz y conversaciones de nuestros servidores.',
+      sec7Title: '7. Contacto y Soporte',
+      sec7Text: 'Para cualquier consulta o ejercicio de derechos de privacidad, contacta con nosotros en: soporte@fit-ai.app.',
+      agreeBtn: 'He Entendido y Acepto',
+    },
+    weeklyCheckIn: {
+      dietAdherenceTitle: 'Adhesión al Plan Nutricional: {val}/10',
+      dietAdherenceHint: '1 = No cumplí nada • 10 = Cumplí calorías y proteína al 100%',
+      energyLevelTitle: 'Nivel Medio de Energía: {val}/10',
+      sleepQualityTitle: 'Calidad del Sueño: {val}/10',
+      painTitle: '¿Dolor o Molestias Articulares?',
+      painHint: 'Indica si sentiste dolor en hombro, rodilla, espalda o tendones.',
+      yes: 'SÍ',
+      no: 'NO',
+      painIntensity: 'Intensidad del dolor: {val}/10',
+      painDescLabel: 'Localización y descripción de la molestia:',
+      painDescPlaceholder: 'Ej: Sentí pinchazos en el hombro derecho en press de banca el miércoles...',
+      evolutionPhotosTitle: 'Fotos de Evolución',
+      evolutionPhotosHint: 'Misma iluminación y distancia para comparar la evolución física semanal.',
+      front: 'Frente',
+      back: 'Espalda',
+      side: 'Lateral',
+      weeklyNotesTitle: 'Notas de la Semana',
+      weeklyNotesPlaceholder: 'Comentarios sobre la semana, apetito, energía, sensaciones...',
+      submitCheckInBtn: 'Enviar Check-in Semanal',
+    },
+    cardio: {
+      isCardio: 'Cardio',
+      durationMinutes: 'Duración (Minutos)',
+      durationPlaceholder: 'Ej: 20',
+      intensity: 'Intensidad / Nivel',
+      intensityPlaceholder: 'Ej: Moderada, Ritmo Constante',
+      intensityMod: 'Moderada',
+      intensityLow: 'Baja / Regenerativa',
+      intensityHigh: 'Alta',
+      intensityHiit: 'HIIT / Por Intervalos',
+      prescribedBadge: 'Cardio Prescrito',
+      minutesUnit: 'min',
+      completedDuration: 'Duración Realizada (min)',
+      perceivedIntensity: 'Intensidad Percibida',
+      completedBadge: 'Completado',
+      completedBtn: 'Marcar Hecho',
+    },
+    chat: {
+      copy: 'Copiar Mensaje',
+      edit: 'Editar Mensaje',
+      delete: 'Eliminar Mensaje',
+      deleteMessage: 'Eliminar Mensaje',
+      deletePrompt: '¿Estás seguro de que deseas eliminar este mensaje para ambos usuarios?',
+      deleteConfirm: 'Eliminar',
+      editing: 'Editando mensaje',
+      messageCopied: '¡Mensaje copiado al portapapeles!',
+      privateChannel: 'Canal Privado 1-a-1',
+      channelDescription: 'Este canal es directo y privado entre tú y {name}. Puedes resolver dudas, enviar audios o vídeos de técnica de ejercicios.',
+      typeMessage: 'Escribe un mensaje...',
+      recordingAudio: 'Grabando audio...',
+      videoTitle: 'Vídeo de Ejecución Técnica',
+      tapToPlay: 'Toca para reproducir',
+      voiceNote: 'Nota de Voz',
+      playingAudio: 'Reproduciendo nota de audio...',
+    },
   },
 
   fr: {
@@ -1803,6 +2251,29 @@ export const translations: Record<Language, Translations> = {
       devSectionTitle: 'Mode de Test Rapide (Sans Google)',
       devCoachBtn: 'Entrer comme Coach (PT)',
       devClientBtn: 'Entrer comme Élève (Client)',
+      nameLabel: 'Nom Complet',
+      namePlaceholder: 'Votre nom',
+      emailLabel: 'E-mail',
+      emailPlaceholder: 'votre.email@exemple.com',
+      passwordLabel: 'Mot de Passe',
+      passwordPlaceholder: 'Minimum 6 caractères',
+      confirmPassword: 'Confirmer le Mot de Passe',
+      confirmPasswordPlaceholder: 'Répétez votre mot de passe',
+      loginTab: 'Se Connecter',
+      registerTab: 'S\'Inscrire',
+      loginBtn: 'Connexion au Compte',
+      registerBtn: 'Créer un Compte Gratuit',
+      orContinueWith: 'ou continuer avec',
+      forgotPassword: 'Mot de passe oublié ?',
+      forgotTitle: 'Récupérer le Mot de Passe',
+      forgotSubtitle: 'Entrez l\'adresse e-mail liée à votre compte pour recevoir un code de vérification à 6 chiffres.',
+      sendCode: 'Envoyer le Code de Récupération',
+      codeStepSubtitle: 'Entrez le code à 6 chiffres envoyé à',
+      codePlaceholder: 'Code à 6 chiffres (ex: 123456)',
+      saveNewPassword: 'Réinitialiser le Mot de Passe',
+      backToEmail: '← Retour et modifier l\'e-mail',
+      termsNotice: 'En continuant, vous acceptez nos',
+      termsAndPrivacyLink: 'Conditions d\'Utilisation et Politique de Confidentialité',
     },
     dashboard: {
       hello: 'Bonjour',
@@ -2076,6 +2547,11 @@ export const translations: Record<Language, Translations> = {
       devTrialExpired: 'Période d\'essai expirée. Toutes les fonctionnalités de coach sont maintenant verrouillées.',
       stripePortal: 'Portail Stripe',
       saveChanges: 'Enregistrer les Modifications',
+      termsAndPrivacyBtn: 'Conditions d\'Utilisation & Confidentialité (RGPD)',
+      accountAndPrivacy: 'Gestion du Compte & Confidentialité',
+      deleteAccountBtn: 'Supprimer Mon Compte',
+      deleteAccountTitle: 'Supprimer Définitivement le Compte',
+      deleteAccountMsg: 'Êtes-vous absolument sûr de vouloir supprimer votre compte ? Cette action est irréversible et supprimera définitivement tous vos entraînements, check-ins, photos d\'évolution et messages.',
     },
     clientDetails: {
       studentFile: 'Fiche de l\'Élève',
@@ -2213,6 +2689,90 @@ export const translations: Record<Language, Translations> = {
       dumbbellAltTag: 'Aux Haltères',
       cableAltTag: 'À la Poulie',
       machineAltTag: 'À la Machine',
+    },
+    privacyTerms: {
+      badgeText: 'Mis à jour en Septembre 2026 · Conforme RGPD & App Store',
+      sec1Title: '1. Objet et Portée de l\'Application',
+      sec1Text: 'Cette plateforme fournit aux Coachs Sportifs et à leurs élèves un environnement numérique pour la prescription d\'entraînements, le suivi des charges, la nutrition, les bilans corporels et la messagerie directe. En utilisant l\'application, l\'utilisateur accepte ces Conditions d\'Utilisation.',
+      sec2Title: '2. Collecte et Finalité des Données Personnelles',
+      sec2Text: 'Pour assurer le bon fonctionnement du service, nous collectons les données suivantes :',
+      sec2Bullet1: 'Données d\'Inscription : Nom, adresse e-mail et mot de passe chiffré (ou identifiant unique via Google).',
+      sec2Bullet2: 'Données Physiologiques et de Santé : Poids, pourcentage de masse grasse, séances effectuées, ressenti d\'effort (RPE) et éventuelles douleurs articulaires déclarées volontairement.',
+      sec2Bullet3: 'Photographies d\'Évolution Corporelle : Photos envoyées lors des bilans hebdomadaires (face, dos, profil) à des fins exclusives d\'évaluation comparative ("Avant / Après") par le coach.',
+      sec3Title: '3. Confidentialité et Isolation des Données',
+      sec3Text: 'Toutes les données de santé, séances, photos et messages sont strictement confidentiels et isolés. Aucun élève n\'a accès aux données des autres. L\'accès est strictement réservé au coach relié par code d\'invitation.',
+      sec4Title: '4. Sécurité et Stockage',
+      sec4Text: 'Nous mettons en œuvre des mesures techniques rigoureuses :',
+      sec4Bullet1: 'Mots de passe chiffrés à sens unique avec l\'algorithme BCrypt et hachage salt.',
+      sec4Bullet2: 'Sessions authentifiées via JSON Web Tokens (JWT) sécurisés et communications chiffrées par HTTPS/SSL.',
+      sec4Bullet3: 'Traitement des paiements géré intégralement par Stripe ; aucune coordonnée bancaire ne transite par nos serveurs.',
+      sec5Title: '5. Droits de l\'Utilisateur (RGPD / GDPR)',
+      sec5Text: 'En vertu du Règlement Général sur la Protection des Données (RGPD), vous disposez du droit de :',
+      sec5Bullet1: 'Consulter et mettre à jour vos informations à tout moment dans votre Profil.',
+      sec5Bullet2: 'Exporter des rapports PDF avec vos métriques et photographies d\'évolution.',
+      sec5Bullet3: 'Demander la révocation d\'accès ou la suppression de l\'association avec votre coach.',
+      sec6Title: '6. Droit à l\'Oubli et Suppression de Compte (Directive Apple 5.1.1)',
+      sec6Text: 'En stricte conformité avec les directives de l\'Apple App Store (Directive 5.1.1(v)), l\'utilisateur peut supprimer définitivement son compte directement dans l\'application via le bouton "Supprimer Mon Compte" dans son Profil.',
+      sec6Subtext: 'La suppression est immédiate, irréversible et supprime en cascade l\'ensemble des entraînements, séries, journaux de repas, bilans, photos, messages vocaux et conversations de nos serveurs.',
+      sec7Title: '7. Contact et Assistance',
+      sec7Text: 'Pour toute demande relative à vos données personnelles ou pour une assistance technique, contactez notre équipe : support@fit-ai.app.',
+      agreeBtn: 'J\'ai Compris et J\'Accepte',
+    },
+    weeklyCheckIn: {
+      dietAdherenceTitle: 'Adhésion au Plan Nutritionnel : {val}/10',
+      dietAdherenceHint: '1 = Pas suivi • 10 = Calories et protéines respectées à 100%',
+      energyLevelTitle: 'Niveau Moyen d\'Énergie : {val}/10',
+      sleepQualityTitle: 'Qualité du Sommeil : {val}/10',
+      painTitle: 'Douleurs ou Gênes Articulaires ?',
+      painHint: 'Indiquez si vous avez ressenti des douleurs aux épaules, genoux, dos ou tendons.',
+      yes: 'OUI',
+      no: 'NON',
+      painIntensity: 'Intensité de la douleur : {val}/10',
+      painDescLabel: 'Localisation et description de la gêne :',
+      painDescPlaceholder: 'Ex : Point douloureux à l\'épaule droite pendant le développé couché...',
+      evolutionPhotosTitle: 'Photos d\'Évolution',
+      evolutionPhotosHint: 'Même éclairage et distance pour comparer l\'évolution physique chaque semaine.',
+      front: 'Face',
+      back: 'Dos',
+      side: 'Profil',
+      weeklyNotesTitle: 'Notes de la Semaine',
+      weeklyNotesPlaceholder: 'Comment s\'est passée la semaine, énergie, appétit, ressentis...',
+      submitCheckInBtn: 'Envoyer le Bilan Hebdomadaire',
+    },
+    cardio: {
+      isCardio: 'Cardio',
+      durationMinutes: 'Durée (Minutes)',
+      durationPlaceholder: 'Ex : 20',
+      intensity: 'Intensité / Allure',
+      intensityPlaceholder: 'Ex : Modérée, Allure Constante',
+      intensityMod: 'Modérée',
+      intensityLow: 'Faible / Récupération',
+      intensityHigh: 'Élevée',
+      intensityHiit: 'HIIT / Fractionné',
+      prescribedBadge: 'Cardio Prescrit',
+      minutesUnit: 'min',
+      completedDuration: 'Durée Réalisée (min)',
+      perceivedIntensity: 'Intensité Ressentie',
+      completedBadge: 'Terminé',
+      completedBtn: 'Marquer Fait',
+    },
+    chat: {
+      copy: 'Copier le Message',
+      edit: 'Modifier le Message',
+      delete: 'Supprimer le Message',
+      deleteMessage: 'Supprimer le Message',
+      deletePrompt: 'Êtes-vous sûr de vouloir supprimer ce message pour les deux utilisateurs ?',
+      deleteConfirm: 'Supprimer',
+      editing: 'Modification du message',
+      messageCopied: 'Message copié dans le presse-papiers !',
+      privateChannel: 'Canal Privé 1-à-1',
+      channelDescription: 'Ce canal est direct et privé entre vous et {name}. Posez vos questions, envoyez des notes vocales ou des vidéos d\'exécution technique.',
+      typeMessage: 'Écrivez un message...',
+      recordingAudio: 'Enregistrement audio en cours...',
+      videoTitle: 'Vidéo d\'Exécution Technique',
+      tapToPlay: 'Appuyez pour lire',
+      voiceNote: 'Note Vocale',
+      playingAudio: 'Lecture de la note vocale...',
     },
   },
 };

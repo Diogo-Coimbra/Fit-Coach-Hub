@@ -23,6 +23,7 @@
     },
     "android": {
       "package": "com.diogocoimbra.fitcoachhub",
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#0B0D10",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -30,10 +31,14 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "permissions": [
-        "CAMERA",
-        "RECORD_AUDIO",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
       "predictiveBackGestureEnabled": false
     },
@@ -54,6 +59,11 @@
           "cameraPermission": "Utilizar a câmara para registo fotográfico de refeições e check-in."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "3bbb589a-8df1-4b37-9bd6-1577b87a1c9c"
+      }
+    }
   }
 }

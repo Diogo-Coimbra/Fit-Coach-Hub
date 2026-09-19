@@ -13,7 +13,7 @@ export default function CreateWorkoutScreen({ route, navigation }: any) {
   const { t } = useLanguage();
   const styles = useMemo(() => getStyles(colors), [colors]);
   const targetClientId = route?.params?.targetClientId;
-  const isTemplate = route?.params?.isTemplate || false;
+  const isTemplate = route?.params?.isTemplate !== undefined ? Boolean(route?.params?.isTemplate) : (user?.role === 'COACH' && !targetClientId);
 
   const categories = useMemo(() => [
     { id: 'Hipertrofia', label: t('workouts.catHypertrophy') },

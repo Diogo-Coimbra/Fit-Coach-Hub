@@ -119,6 +119,11 @@ model Exercise {
   videoUrl    String?  // Link de vídeo/GIF de demonstração da técnica
   audioUrl    String?  // Nota de áudio do PT com instruções de execução
   
+  // Especificidades de Cardio
+  isCardio        Boolean  @default(false)
+  durationMinutes Int?     // Duração sugerida em minutos (ex: 20, 30, 45)
+  intensity       String?  // Intensidade sugerida (ex: Moderada, HIIT, Zona 2)
+
   // Relação: A que treino pertence este exercício?
   workoutId   String   
   workout     Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
@@ -157,6 +162,10 @@ model WorkoutSetLog {
   completed    Boolean    @default(true)
   rpe          Float?     // Escala de esforço subjetivo (ex: 8.5)
   setType      String?    @default("NORMAL") // NORMAL, WARMUP, DROPSET, FAILURE
+  
+  // Registo de Cardio
+  durationMinutes Int?    // Duração real realizada em minutos
+  intensity       String? // Intensidade executada
 
   workoutLog   WorkoutLog @relation(fields: [workoutLogId], references: [id], onDelete: Cascade)
   exercise     Exercise?  @relation(fields: [exerciseId], references: [id], onDelete: SetNull)

@@ -34,6 +34,9 @@ export default function AddExerciseScreen({ route, navigation }: any) {
 
   // Form State
   const [name, setName] = useState('');
+  const [isCardio, setIsCardio] = useState(false);
+  const [durationMinutes, setDurationMinutes] = useState('20');
+  const [intensity, setIntensity] = useState('Moderada');
   const [sets, setSets] = useState('3');
   const [reps, setReps] = useState('10');
   const [weight, setWeight] = useState('');
@@ -59,19 +62,31 @@ export default function AddExerciseScreen({ route, navigation }: any) {
   const handleSelectFromLibrary = (exercise: LibraryExercise) => {
     setSelectedExerciseMeta(exercise);
     setName(exercise.name);
-    setSets(exercise.defaultSets.toString());
-    setReps(exercise.defaultReps.toString());
-    setRestSeconds(exercise.defaultRestSeconds.toString());
+    const isCardioEx = Boolean(exercise.isCardio || exercise.category === 'cardio');
+    setIsCardio(isCardioEx);
+    if (isCardioEx) {
+      setDurationMinutes((exercise.defaultDurationMinutes || 20).toString());
+      setIntensity(exercise.defaultIntensity || 'Moderada');
+    } else {
+      setSets(exercise.defaultSets.toString());
+      setReps(exercise.defaultReps.toString());
+      setRestSeconds(exercise.defaultRestSeconds.toString());
+    }
     setNotes(exercise.instructions);
     setIsLibraryExpanded(false);
   };
 
   const handleClearSelection = () => {
     setSelectedExerciseMeta(null);
+    setIsCardio(false);
   };
 
   const handleAddExercise = async () => {
-    if (!name.trim() || !sets.trim() || !reps.trim()) {
+    if (!name.trim()) {
+      Alert.alert(t('workouts.requiredFieldsTitle'), t('workouts.nameRequiredAlert'));
+      return;
+    }
+    if (!isCardio && (!sets.trim() || !reps.trim())) {
       Alert.alert(t('workouts.requiredFieldsTitle'), t('workouts.requiredFieldsAlert'));
       return;
     }
@@ -81,10 +96,13 @@ export default function AddExerciseScreen({ route, navigation }: any) {
     try {
       await api.post('/api/exercises', {
         name: name.trim(),
-        sets: parseInt(sets) || 3,
-        reps: parseInt(reps) || 10,
-        weight: weight ? parseFloat(weight.replace(',', '.')) : null,
-        restSeconds: parseInt(restSeconds) || 90,
+        isCardio,
+        durationMinutes: isCardio ? (parseInt(durationMinutes) || 20) : null,
+        intensity: isCardio ? (intensity.trim() || null) : null,
+        sets: isCardio ? 1 : (parseInt(sets) || 3),
+        reps: isCardio ? 1 : (parseInt(reps) || 10),
+        weight: isCardio ? null : (weight ? parseFloat(weight.replace(',', '.')) : null),
+        restSeconds: isCardio ? 0 : (parseInt(restSeconds) || 90),
         notes: notes.trim() || undefined,
         videoUrl: videoUrl.trim() || undefined,
         workoutId,
@@ -101,6 +119,8 @@ export default function AddExerciseScreen({ route, navigation }: any) {
 
   const getCategoryLabel = (catId: string) => {
     switch (catId) {
+      case 'cardio':
+        return 'Cardio';
       case 'chest':
         return t('workouts.catChest');
       case 'back':
@@ -108,6 +128,7 @@ export default function AddExerciseScreen({ route, navigation }: any) {
       case 'legs':
         return t('workouts.catLegs');
       case 'shoulders':
+        return t('workouts.catShoulders');
         return t('workouts.catShoulders');
       case 'arms':
         return t('workouts.catArms');
@@ -244,45 +265,120 @@ export default function AddExerciseScreen({ route, navigation }: any) {
             onChangeText={setName}
           />
 
-          <View style={styles.row}>
-            <View style={styles.half}>
-              <Field
-                label={t('workouts.targetSets')}
-                keyboardType="numeric"
-                value={sets}
-                onChangeText={setSets}
-              />
-            </View>
-            <View style={styles.half}>
-              <Field
-                label={t('workouts.repsLabel')}
-                keyboardType="numeric"
-                value={reps}
-                onChangeText={setReps}
-              />
-            </View>
+          {/* Seletor Tipo: Musculação vs Cardio */}
+          <View style={styles.cardioToggleRow}>
+            <TouchableOpacity
+              style={[styles.typeBtn, !isCardio && styles.typeBtnActive]}
+              onPress={() => setIsCardio(false)}
+            >
+              <Ionicons name="barbell-outline" size={16} color={!isCardio ? '#FFFFFF' : colors.muted} />
+              <Text style={[styles.typeBtnText, !isCardio && styles.typeBtnTextActive]}>
+                Musculação
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.typeBtn, isCardio && styles.typeBtnActive]}
+              onPress={() => setIsCardio(true)}
+            >
+              <Ionicons name="heart-outline" size={16} color={isCardio ? '#FFFFFF' : colors.muted} />
+              <Text style={[styles.typeBtnText, isCardio && styles.typeBtnTextActive]}>
+                {t('cardio.isCardio')}
+              </Text>
+            </TouchableOpacity>
           </View>
 
-          <View style={styles.row}>
-            <View style={styles.half}>
+          {isCardio ? (
+            <View style={{ gap: 12, marginBottom: 12 }}>
               <Field
-                label={t('workouts.suggestedWeight')}
-                placeholder="50"
+                label={t('cardio.durationMinutes')}
+                placeholder={t('cardio.durationPlaceholder')}
                 keyboardType="numeric"
-                value={weight}
-                onChangeText={setWeight}
+                value={durationMinutes}
+                onChangeText={setDurationMinutes}
               />
-            </View>
-            <View style={styles.half}>
+              <View style={styles.quickPillsRow}>
+                {['15', '20', '30', '45', '60'].map((mins) => (
+                  <TouchableOpacity
+                    key={mins}
+                    style={[styles.quickPill, durationMinutes === mins && styles.quickPillActive]}
+                    onPress={() => setDurationMinutes(mins)}
+                  >
+                    <Text style={[styles.quickPillText, durationMinutes === mins && styles.quickPillTextActive]}>
+                      {mins} min
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
               <Field
-                label={t('workouts.restSecondsLabel')}
-                placeholder="90"
-                keyboardType="numeric"
-                value={restSeconds}
-                onChangeText={setRestSeconds}
+                label={t('cardio.intensity')}
+                placeholder={t('cardio.intensityPlaceholder')}
+                value={intensity}
+                onChangeText={setIntensity}
               />
+              <View style={styles.quickPillsRow}>
+                {[
+                  t('cardio.intensityMod'),
+                  t('cardio.intensityLow'),
+                  t('cardio.intensityHigh'),
+                  t('cardio.intensityHiit'),
+                ].map((level) => (
+                  <TouchableOpacity
+                    key={level}
+                    style={[styles.quickPill, intensity === level && styles.quickPillActive]}
+                    onPress={() => setIntensity(level)}
+                  >
+                    <Text style={[styles.quickPillText, intensity === level && styles.quickPillTextActive]}>
+                      {level}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          </View>
+          ) : (
+            <>
+              <View style={styles.row}>
+                <View style={styles.half}>
+                  <Field
+                    label={t('workouts.targetSets')}
+                    keyboardType="numeric"
+                    value={sets}
+                    onChangeText={setSets}
+                  />
+                </View>
+                <View style={styles.half}>
+                  <Field
+                    label={t('workouts.repsLabel')}
+                    keyboardType="numeric"
+                    value={reps}
+                    onChangeText={setReps}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.row}>
+                <View style={styles.half}>
+                  <Field
+                    label={t('workouts.suggestedWeight')}
+                    placeholder="50"
+                    keyboardType="numeric"
+                    value={weight}
+                    onChangeText={setWeight}
+                  />
+                </View>
+                <View style={styles.half}>
+                  <Field
+                    label={t('workouts.restSecondsLabel')}
+                    placeholder="90"
+                    keyboardType="numeric"
+                    value={restSeconds}
+                    onChangeText={setRestSeconds}
+                  />
+                </View>
+              </View>
+            </>
+          )}
 
           <Field
             label="Link de Vídeo / GIF Demonstrativo"
@@ -468,5 +564,63 @@ const getStyles = (colors: ColorScheme) =>
     },
     half: {
       flex: 1,
+    },
+    cardioToggleRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginBottom: 14,
+    },
+    typeBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 10,
+      borderRadius: radius.md,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    typeBtnActive: {
+      backgroundColor: colors.accent,
+      borderColor: colors.accent,
+    },
+    typeBtnText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.muted,
+    },
+    typeBtnTextActive: {
+      color: '#FFFFFF',
+      fontWeight: '700',
+    },
+    quickPillsRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginTop: -4,
+      marginBottom: 8,
+    },
+    quickPill: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: radius.sm,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    quickPillActive: {
+      backgroundColor: colors.accent + '20',
+      borderColor: colors.accent,
+    },
+    quickPillText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.muted,
+    },
+    quickPillTextActive: {
+      color: colors.accent,
+      fontWeight: '700',
     },
   });

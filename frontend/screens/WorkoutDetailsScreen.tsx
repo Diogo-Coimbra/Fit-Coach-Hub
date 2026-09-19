@@ -75,6 +75,25 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
   const [guideModalVisible, setGuideModalVisible] = useState(false);
   const [guideTarget, setGuideTarget] = useState<any>(null);
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
+  const [cardioLogs, setCardioLogs] = useState<Record<string, { durationMinutes: string; intensity: string; completed: boolean }>>({});
+
+  const getCardioState = (item: any) => {
+    return cardioLogs[item.id] || {
+      durationMinutes: item.durationMinutes ? String(item.durationMinutes) : '20',
+      intensity: item.intensity || 'Moderada',
+      completed: false,
+    };
+  };
+
+  const updateCardioState = (exerciseId: string, updates: Partial<{ durationMinutes: string; intensity: string; completed: boolean }>) => {
+    setCardioLogs((prev) => ({
+      ...prev,
+      [exerciseId]: {
+        ...(prev[exerciseId] || {}),
+        ...updates,
+      },
+    }));
+  };
 
   const handleSubstitute = async (newExerciseName: string) => {
     if (!substituteTarget?.id) return;
@@ -386,18 +405,38 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
       // Mapear todas as séries para envio ao backend incluindo setType
       const flatSets: any[] = [];
       (workoutDetails.exercises || []).forEach((ex: any) => {
-        const sets = exerciseSets[ex.id] || [];
-        sets.forEach((s) => {
+        if (ex.isCardio) {
+          const cState = cardioLogs[ex.id] || {
+            durationMinutes: ex.durationMinutes ? String(ex.durationMinutes) : '20',
+            intensity: ex.intensity || 'Moderada',
+            completed: true,
+          };
           flatSets.push({
             exerciseId: ex.id,
             exerciseName: ex.name,
-            setNumber: s.setNumber,
-            reps: Number(s.reps) || 0,
-            weight: s.weight ? Number(s.weight.replace(',', '.')) : 0,
-            completed: s.completed,
-            setType: s.setType || 'NORMAL',
+            setNumber: 1,
+            reps: 1,
+            weight: 0,
+            completed: cState.completed !== false,
+            setType: 'NORMAL',
+            isCardio: true,
+            durationMinutes: parseInt(cState.durationMinutes) || ex.durationMinutes || 20,
+            intensity: cState.intensity || ex.intensity || 'Moderada',
           });
-        });
+        } else {
+          const sets = exerciseSets[ex.id] || [];
+          sets.forEach((s) => {
+            flatSets.push({
+              exerciseId: ex.id,
+              exerciseName: ex.name,
+              setNumber: s.setNumber,
+              reps: Number(s.reps) || 0,
+              weight: s.weight ? Number(s.weight.replace(',', '.')) : 0,
+              completed: s.completed,
+              setType: s.setType || 'NORMAL',
+            });
+          });
+        }
       });
 
       const combinedNotes = [workoutNotes.trim(), feedback.notes.trim()].filter(Boolean).join(' | ');
@@ -514,7 +553,14 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
         <View style={styles.exerciseHeader}>
           <View style={styles.headerInfo}>
             <Text style={styles.exerciseTitle}>{item.name}</Text>
-            {pr ? (
+            {item.isCardio ? (
+              <View style={[styles.prBadge, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
+                <Ionicons name="heart-outline" size={12} color="#EF4444" style={{ marginRight: 3 }} />
+                <Text style={[styles.prBadgeText, { color: '#EF4444' }]}>
+                  {item.durationMinutes || 20} min • {item.intensity || 'Moderada'}
+                </Text>
+              </View>
+            ) : pr ? (
               <View style={styles.prBadge}>
                 <Ionicons name="trophy-outline" size={12} color={colors.accent} style={{ marginRight: 3 }} />
                 <Text style={styles.prBadgeText}>{t('workouts.record')}: {pr} kg</Text>
@@ -565,126 +611,189 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
           <Text style={styles.exerciseNotes}>{item.notes}</Text>
         ) : null}
 
-        {/* Cabeçalho da Tabela com Desempenho Anterior */}
-        <View style={styles.tableHeader}>
-          <Text style={[styles.colHeader, { width: 38, textAlign: 'center' }]}>{t('workouts.set')}</Text>
-          <Text style={[styles.colHeader, { width: 66, textAlign: 'center' }]}>{t('workouts.previous')}</Text>
-          <Text style={[styles.colHeader, { flex: 1.1, textAlign: 'center' }]}>{t('workouts.weight')} (kg)</Text>
-          <Text style={[styles.colHeader, { flex: 1, textAlign: 'center' }]}>{t('workouts.reps')}</Text>
-          <Text style={[styles.colHeader, { width: 38, textAlign: 'center' }]}>{t('common.status')}</Text>
-        </View>
-
-        {/* Linhas de Séries Interativas */}
-        {sets.map((s, idx) => {
-          const pastSet = pastPerf?.sets?.[idx];
-          const pastSetDisplay = pastSet
-            ? `${pastSet.weight ?? 0}kg × ${pastSet.reps}`
-            : '-';
-
-          return (
-            <View key={`set-${item.id}-${idx}`} style={[styles.setRow, s.completed && styles.setRowCompleted]}>
-              {/* Botão Cíclico de Tipo de Série (1, W, D, F) */}
-              <TouchableOpacity
-                style={styles.setTypeBtn}
-                onPress={() => cycleSetType(item.id, idx)}
-              >
-                {renderSetTypeBadge(s.setType, s.setNumber)}
-              </TouchableOpacity>
-
-              {/* Registo Anterior */}
-              <View style={styles.previousCell}>
-                <Text style={styles.previousText} numberOfLines={1}>
-                  {pastSetDisplay}
-                </Text>
-              </View>
-
-              {/* Stepper e Input de Carga (kg) */}
-              <View style={styles.stepperContainer}>
-                <TouchableOpacity
-                  style={styles.stepperBtn}
-                  onPress={() => adjustWeight(item.id, idx, -2.5)}
-                >
-                  <Text style={styles.stepperBtnText}>-</Text>
-                </TouchableOpacity>
-
-                <TextInput
-                  style={styles.stepperInput}
-                  keyboardType="numeric"
-                  value={s.weight}
-                  placeholder={String(pastSet?.weight ?? item.weight ?? 0)}
-                  placeholderTextColor={colors.muted}
-                  onChangeText={(val) => updateSetValue(item.id, idx, 'weight', val)}
-                />
-
-                <TouchableOpacity
-                  style={styles.stepperBtn}
-                  onPress={() => adjustWeight(item.id, idx, 2.5)}
-                >
-                  <Text style={styles.stepperBtnText}>+</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Stepper e Input de Repetições */}
-              <View style={styles.stepperContainer}>
-                <TouchableOpacity
-                  style={styles.stepperBtn}
-                  onPress={() => adjustReps(item.id, idx, -1)}
-                >
-                  <Text style={styles.stepperBtnText}>-</Text>
-                </TouchableOpacity>
-
-                <TextInput
-                  style={styles.stepperInput}
-                  keyboardType="numeric"
-                  value={s.reps}
-                  placeholder={String(pastSet?.reps ?? item.reps ?? 10)}
-                  placeholderTextColor={colors.muted}
-                  onChangeText={(val) => updateSetValue(item.id, idx, 'reps', val)}
-                />
-
-                <TouchableOpacity
-                  style={styles.stepperBtn}
-                  onPress={() => adjustReps(item.id, idx, 1)}
-                >
-                  <Text style={styles.stepperBtnText}>+</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Botão de Conclusão da Série */}
-              <TouchableOpacity
-                style={[styles.checkBtn, s.completed && styles.checkBtnActive]}
-                onPress={() => toggleSetCompletion(item.id, idx, item.restSeconds)}
-              >
-                <Ionicons
-                  name="checkmark"
-                  size={16}
-                  color={s.completed ? colors.bg : colors.muted}
-                />
-              </TouchableOpacity>
+        {item.isCardio ? (
+          <View style={styles.cardioBox}>
+            <View style={styles.cardioPrescribedRow}>
+              <Ionicons name="heart" size={16} color="#EF4444" />
+              <Text style={[styles.cardioPrescribedText, { color: colors.text }]}>
+                {t('cardio.prescribedBadge')}: {item.durationMinutes || 20} {t('cardio.minutesUnit')} • {item.intensity || 'Moderada'}
+              </Text>
             </View>
-          );
-        })}
 
-        {/* Ações Rápidas: Adicionar Série Extra ou Remover Última Série */}
-        <View style={styles.setActionsRow}>
-          <TouchableOpacity
-            style={styles.addSetInlineBtn}
-            onPress={() => addSetToExercise(item.id, item.weight, item.reps)}
-          >
-            <Ionicons name="add" size={14} color={colors.accent} />
-            <Text style={styles.addSetInlineText}>+ {t('workouts.set')}</Text>
-          </TouchableOpacity>
+            <View style={styles.cardioInputRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.cardioInputLabel, { color: colors.muted }]}>{t('cardio.completedDuration')}</Text>
+                <TextInput
+                  style={[styles.cardioInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
+                  keyboardType="numeric"
+                  value={getCardioState(item).durationMinutes}
+                  onChangeText={(val) => updateCardioState(item.id, { durationMinutes: val })}
+                  placeholder={String(item.durationMinutes || 20)}
+                  placeholderTextColor={colors.muted}
+                />
+              </View>
 
-          {sets.length > 1 && (
+              <View style={{ flex: 1.5, marginLeft: 10 }}>
+                <Text style={[styles.cardioInputLabel, { color: colors.muted }]}>{t('cardio.perceivedIntensity')}</Text>
+                <TextInput
+                  style={[styles.cardioInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
+                  value={getCardioState(item).intensity}
+                  onChangeText={(val) => updateCardioState(item.id, { intensity: val })}
+                  placeholder={item.intensity || 'Moderada'}
+                  placeholderTextColor={colors.muted}
+                />
+              </View>
+            </View>
+
             <TouchableOpacity
-              style={styles.removeSetInlineBtn}
-              onPress={() => removeLastSetFromExercise(item.id)}
+              style={[
+                styles.cardioCompleteBtn,
+                getCardioState(item).completed
+                  ? { backgroundColor: '#10B981', borderColor: '#10B981' }
+                  : { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+              onPress={() => updateCardioState(item.id, { completed: !getCardioState(item).completed })}
+              activeOpacity={0.8}
             >
-              <Ionicons name="trash-outline" size={13} color={colors.danger} />
-              <Text style={styles.removeSetInlineText}>{t('common.remove')}</Text>
+              <Ionicons
+                name={getCardioState(item).completed ? 'checkmark-circle' : 'ellipse-outline'}
+                size={20}
+                color={getCardioState(item).completed ? '#FFFFFF' : colors.muted}
+              />
+              <Text
+                style={[
+                  styles.cardioCompleteBtnText,
+                  { color: getCardioState(item).completed ? '#FFFFFF' : colors.text },
+                ]}
+              >
+                {getCardioState(item).completed ? t('cardio.completedBadge') : t('cardio.completedBtn')}
+              </Text>
             </TouchableOpacity>
-          )}
-        </View>
+          </View>
+        ) : (
+          <>
+            {/* Cabeçalho da Tabela com Desempenho Anterior */}
+            <View style={styles.tableHeader}>
+              <Text style={[styles.colHeader, { width: 38, textAlign: 'center' }]}>{t('workouts.set')}</Text>
+              <Text style={[styles.colHeader, { width: 66, textAlign: 'center' }]}>{t('workouts.previous')}</Text>
+              <Text style={[styles.colHeader, { flex: 1.1, textAlign: 'center' }]}>{t('workouts.weight')} (kg)</Text>
+              <Text style={[styles.colHeader, { flex: 1, textAlign: 'center' }]}>{t('workouts.reps')}</Text>
+              <Text style={[styles.colHeader, { width: 38, textAlign: 'center' }]}>{t('common.status')}</Text>
+            </View>
+
+            {/* Linhas de Séries Interativas */}
+            {sets.map((s, idx) => {
+              const pastSet = pastPerf?.sets?.[idx];
+              const pastSetDisplay = pastSet
+                ? `${pastSet.weight ?? 0}kg × ${pastSet.reps}`
+                : '-';
+
+              return (
+                <View key={`set-${item.id}-${idx}`} style={[styles.setRow, s.completed && styles.setRowCompleted]}>
+                  {/* Botão Cíclico de Tipo de Série (1, W, D, F) */}
+                  <TouchableOpacity
+                    style={styles.setTypeBtn}
+                    onPress={() => cycleSetType(item.id, idx)}
+                  >
+                    {renderSetTypeBadge(s.setType, s.setNumber)}
+                  </TouchableOpacity>
+
+                  {/* Registo Anterior */}
+                  <View style={styles.previousCell}>
+                    <Text style={styles.previousText} numberOfLines={1}>
+                      {pastSetDisplay}
+                    </Text>
+                  </View>
+
+                  {/* Stepper e Input de Carga (kg) */}
+                  <View style={styles.stepperContainer}>
+                    <TouchableOpacity
+                      style={styles.stepperBtn}
+                      onPress={() => adjustWeight(item.id, idx, -2.5)}
+                    >
+                      <Text style={styles.stepperBtnText}>-</Text>
+                    </TouchableOpacity>
+
+                    <TextInput
+                      style={styles.stepperInput}
+                      keyboardType="numeric"
+                      value={s.weight}
+                      placeholder={String(pastSet?.weight ?? item.weight ?? 0)}
+                      placeholderTextColor={colors.muted}
+                      onChangeText={(val) => updateSetValue(item.id, idx, 'weight', val)}
+                    />
+
+                    <TouchableOpacity
+                      style={styles.stepperBtn}
+                      onPress={() => adjustWeight(item.id, idx, 2.5)}
+                    >
+                      <Text style={styles.stepperBtnText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Stepper e Input de Repetições */}
+                  <View style={styles.stepperContainer}>
+                    <TouchableOpacity
+                      style={styles.stepperBtn}
+                      onPress={() => adjustReps(item.id, idx, -1)}
+                    >
+                      <Text style={styles.stepperBtnText}>-</Text>
+                    </TouchableOpacity>
+
+                    <TextInput
+                      style={styles.stepperInput}
+                      keyboardType="numeric"
+                      value={s.reps}
+                      placeholder={String(pastSet?.reps ?? item.reps ?? 10)}
+                      placeholderTextColor={colors.muted}
+                      onChangeText={(val) => updateSetValue(item.id, idx, 'reps', val)}
+                    />
+
+                    <TouchableOpacity
+                      style={styles.stepperBtn}
+                      onPress={() => adjustReps(item.id, idx, 1)}
+                    >
+                      <Text style={styles.stepperBtnText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Botão de Conclusão da Série */}
+                  <TouchableOpacity
+                    style={[styles.checkBtn, s.completed && styles.checkBtnActive]}
+                    onPress={() => toggleSetCompletion(item.id, idx, item.restSeconds)}
+                  >
+                    <Ionicons
+                      name="checkmark"
+                      size={16}
+                      color={s.completed ? colors.bg : colors.muted}
+                    />
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+
+            {/* Ações Rápidas: Adicionar Série Extra ou Remover Última Série */}
+            <View style={styles.setActionsRow}>
+              <TouchableOpacity
+                style={styles.addSetInlineBtn}
+                onPress={() => addSetToExercise(item.id, item.weight, item.reps)}
+              >
+                <Ionicons name="add" size={14} color={colors.accent} />
+                <Text style={styles.addSetInlineText}>+ {t('workouts.set')}</Text>
+              </TouchableOpacity>
+
+              {sets.length > 1 && (
+                <TouchableOpacity
+                  style={styles.removeSetInlineBtn}
+                  onPress={() => removeLastSetFromExercise(item.id)}
+                >
+                  <Ionicons name="trash-outline" size={13} color={colors.danger} />
+                  <Text style={styles.removeSetInlineText}>{t('common.remove')}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </>
+        )}
       </Card>
     );
   };
@@ -1197,5 +1306,54 @@ const getStyles = (colors: ColorScheme) => StyleSheet.create({
   footerContainer: {
     marginTop: 10,
     gap: 10,
+  },
+  cardioBox: {
+    marginTop: 8,
+    padding: 12,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 10,
+  },
+  cardioPrescribedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  cardioPrescribedText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  cardioInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cardioInputLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  cardioInput: {
+    height: 40,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  cardioCompleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  cardioCompleteBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

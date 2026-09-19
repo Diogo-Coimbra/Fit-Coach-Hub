@@ -1,23 +1,27 @@
 export interface LibraryExercise {
   id: string;
   name: string;
-  category: 'chest' | 'back' | 'legs' | 'shoulders' | 'arms' | 'core';
-  equipment: 'barbell' | 'dumbbell' | 'machine' | 'cable' | 'bodyweight';
+  category: 'chest' | 'back' | 'legs' | 'shoulders' | 'arms' | 'core' | 'cardio';
+  equipment: 'barbell' | 'dumbbell' | 'machine' | 'cable' | 'bodyweight' | 'cardio';
   equipmentLabel: string;
   defaultSets: number;
   defaultReps: number;
   defaultRestSeconds: number;
   instructions: string;
+  isCardio?: boolean;
+  defaultDurationMinutes?: number;
+  defaultIntensity?: string;
 }
 
 export interface MuscleCategory {
-  id: 'all' | 'chest' | 'back' | 'legs' | 'shoulders' | 'arms' | 'core';
+  id: 'all' | 'chest' | 'back' | 'legs' | 'shoulders' | 'arms' | 'core' | 'cardio';
   labelKey: string;
   fallbackLabel: string;
 }
 
 export const MUSCLE_CATEGORIES: MuscleCategory[] = [
   { id: 'all', labelKey: 'exercises.catAll', fallbackLabel: 'Todos' },
+  { id: 'cardio', labelKey: 'exercises.catCardio', fallbackLabel: 'Cardio' },
   { id: 'chest', labelKey: 'exercises.catChest', fallbackLabel: 'Peito' },
   { id: 'back', labelKey: 'exercises.catBack', fallbackLabel: 'Costas' },
   { id: 'legs', labelKey: 'exercises.catLegs', fallbackLabel: 'Pernas' },
@@ -444,5 +448,147 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
     defaultReps: 10,
     defaultRestSeconds: 60,
     instructions: 'Manter a bacia em retroversão sem deixar a lombar cair (arcar).',
+  },
+
+  // ==================== CARDIO ====================
+  {
+    id: 'cardio_treadmill_run',
+    name: 'Passadeira (Corrida Contínua)',
+    category: 'cardio',
+    equipment: 'cardio',
+    equipmentLabel: 'Passadeira',
+    defaultSets: 1,
+    defaultReps: 1,
+    defaultRestSeconds: 0,
+    isCardio: true,
+    defaultDurationMinutes: 25,
+    defaultIntensity: 'Moderada (Zona 2)',
+    instructions: 'Ritmo aeróbico constante. Manter postura ereta, passada suave e respiração ritmada.',
+  },
+  {
+    id: 'cardio_treadmill_incline',
+    name: 'Passadeira (Caminhada Inclinada)',
+    category: 'cardio',
+    equipment: 'cardio',
+    equipmentLabel: 'Passadeira',
+    defaultSets: 1,
+    defaultReps: 1,
+    defaultRestSeconds: 0,
+    isCardio: true,
+    defaultDurationMinutes: 30,
+    defaultIntensity: 'Moderada / Queima de Gordura',
+    instructions: 'Inclinação de 8% a 12% a 4.5-5.5 km/h sem segurar nas pegas para máxima ativação de glúteos e gémeos.',
+  },
+  {
+    id: 'cardio_stationary_bike',
+    name: 'Bicicleta Estática (Spinning)',
+    category: 'cardio',
+    equipment: 'cardio',
+    equipmentLabel: 'Bicicleta',
+    defaultSets: 1,
+    defaultReps: 1,
+    defaultRestSeconds: 0,
+    isCardio: true,
+    defaultDurationMinutes: 30,
+    defaultIntensity: 'Moderada (Zona 2 / 3)',
+    instructions: 'Ajustar o selim à altura da anca. Cadência constante de 70-90 RPM com resistência moderada.',
+  },
+  {
+    id: 'cardio_air_bike',
+    name: 'Assault Bike / Air Bike (HIIT)',
+    category: 'cardio',
+    equipment: 'cardio',
+    equipmentLabel: 'Air Bike',
+    defaultSets: 1,
+    defaultReps: 1,
+    defaultRestSeconds: 0,
+    isCardio: true,
+    defaultDurationMinutes: 15,
+    defaultIntensity: 'Alta / Intervalado HIIT',
+    instructions: 'Empurrar e puxar os braços ativamente enquanto pedala com intensidade máxima.',
+  },
+  {
+    id: 'cardio_rowing_machine',
+    name: 'Remo Indoor (Ergómetro)',
+    category: 'cardio',
+    equipment: 'cardio',
+    equipmentLabel: 'Remo',
+    defaultSets: 1,
+    defaultReps: 1,
+    defaultRestSeconds: 0,
+    isCardio: true,
+    defaultDurationMinutes: 20,
+    defaultIntensity: 'Moderada a Alta',
+    instructions: 'Sequência motora correta: Pernas -> Tronco -> Braços no impulso; Braços -> Tronco -> Pernas na recuperação.',
+  },
+  {
+    id: 'cardio_elliptical',
+    name: 'Elíptica (Cross Trainer)',
+    category: 'cardio',
+    equipment: 'cardio',
+    equipmentLabel: 'Elíptica',
+    defaultSets: 1,
+    defaultReps: 1,
+    defaultRestSeconds: 0,
+    isCardio: true,
+    defaultDurationMinutes: 25,
+    defaultIntensity: 'Moderada (Baixo Impacto)',
+    instructions: 'Exercício de baixo impacto nas articulações dos joelhos. Manter calcanhares apoiados.',
+  },
+  {
+    id: 'cardio_stairmaster',
+    name: 'Escadas / Stair Climber (Stairmaster)',
+    category: 'cardio',
+    equipment: 'cardio',
+    equipmentLabel: 'Escadas',
+    defaultSets: 1,
+    defaultReps: 1,
+    defaultRestSeconds: 0,
+    isCardio: true,
+    defaultDurationMinutes: 20,
+    defaultIntensity: 'Moderada a Alta',
+    instructions: 'Passos completos apoiando todo o pé nos degraus. Evitar debruçar o peso sobre o corrimão.',
+  },
+  {
+    id: 'cardio_jump_rope',
+    name: 'Corda de Saltar (Jump Rope)',
+    category: 'cardio',
+    equipment: 'cardio',
+    equipmentLabel: 'Corda',
+    defaultSets: 1,
+    defaultReps: 1,
+    defaultRestSeconds: 0,
+    isCardio: true,
+    defaultDurationMinutes: 15,
+    defaultIntensity: 'Alta / HIIT',
+    instructions: 'Saltos curtos sobre as pontas dos pés, mantendo os cotovelos junto ao corpo e rotação nos pulsos.',
+  },
+  {
+    id: 'cardio_outdoor_run',
+    name: 'Corrida ao Ar Livre (Outdoor)',
+    category: 'cardio',
+    equipment: 'cardio',
+    equipmentLabel: 'Exterior',
+    defaultSets: 1,
+    defaultReps: 1,
+    defaultRestSeconds: 0,
+    isCardio: true,
+    defaultDurationMinutes: 30,
+    defaultIntensity: 'Moderada (Zona 2)',
+    instructions: 'Corrida contínua na rua ou pista mantendo ritmo de conversa confortável.',
+  },
+  {
+    id: 'cardio_hiit_circuit',
+    name: 'Circuito HIIT (Cardio Funcional)',
+    category: 'cardio',
+    equipment: 'cardio',
+    equipmentLabel: 'Funcional',
+    defaultSets: 1,
+    defaultReps: 1,
+    defaultRestSeconds: 0,
+    isCardio: true,
+    defaultDurationMinutes: 20,
+    defaultIntensity: 'Muito Alta (HIIT)',
+    instructions: 'Intervalos de 30s de esforço máximo (Burpees, Mountain Climbers, Jumping Jacks) por 15-30s de descanso.',
   },
 ];

@@ -476,17 +476,57 @@ app.post('/api/auth/google', async (req, res) => {
   }
 
   try {
-    const ticket = await googleClient.verifyIdToken({
-      idToken: token,
-      audience: [
-        process.env.GOOGLE_CLIENT_ID,
-        '715283938816-4hio2kbp5u27nifolr33ot4d1fr5s8m8.apps.googleusercontent.com',
-        '715283938816-qv35s088tbu2npb5am41i76qmtkl986r.apps.googleusercontent.com',
-      ].filter(Boolean) as string[],
-    });
+    let payload: { sub: string; email?: string; name?: string; picture?: string } | null = null;
 
-    const payload = ticket.getPayload();
-    if (!payload) return res.status(400).json({ error: 'Erro Google' });
+    // 1. Tentar validação como JWT ID Token
+    try {
+      const ticket = await googleClient.verifyIdToken({
+        idToken: token,
+        audience: [
+          process.env.GOOGLE_CLIENT_ID,
+          '715283938816-4hio2kbp5u27nifolr33ot4d1fr5s8m8.apps.googleusercontent.com',
+          '715283938816-qv35s088tbu2npb5am41i76qmtkl986r.apps.googleusercontent.com',
+        ].filter(Boolean) as string[],
+      });
+
+      const p = ticket.getPayload();
+      if (p && p.sub) {
+        payload = {
+          sub: p.sub,
+          email: p.email,
+          name: p.name,
+          picture: p.picture,
+        };
+      }
+    } catch (jwtErr: any) {
+      console.warn("⚠️ verifyIdToken falhou, a tentar endpoint userinfo da Google:", jwtErr?.message);
+    }
+
+    // 2. Se não for ID Token ou se falhou a audiência, validar via Google UserInfo API (suporta Access Token)
+    if (!payload) {
+      try {
+        const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (userInfoRes.ok) {
+          const uInfo: any = await userInfoRes.json();
+          if (uInfo && uInfo.sub) {
+            payload = {
+              sub: uInfo.sub,
+              email: uInfo.email,
+              name: uInfo.name,
+              picture: uInfo.picture,
+            };
+          }
+        }
+      } catch (userInfoErr) {
+        console.error("❌ Erro ao validar token com endpoint userinfo da Google:", userInfoErr);
+      }
+    }
+
+    if (!payload || !payload.sub || !payload.email) {
+      return res.status(401).json({ error: 'Token inválido ou expirado!' });
+    }
 
     const selectedRole: Role = role === 'COACH' ? 'COACH' : 'CLIENT';
     const trialEndsAt = selectedRole === 'COACH' ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) : null;
@@ -496,8 +536,8 @@ app.post('/api/auth/google', async (req, res) => {
       update: {},
       create: {
         googleId: payload.sub,
-        email: payload.email!,
-        name: payload.name!,
+        email: payload.email,
+        name: payload.name || payload.email.split('@')[0],
         picture: payload.picture,
         role: selectedRole,
         trialEndsAt: trialEndsAt,
@@ -506,7 +546,7 @@ app.post('/api/auth/google', async (req, res) => {
 
     const jwtToken = generateToken(user);
 
-    console.log(`✅ Utilizador autenticado: ${user.name} (${user.role})`);
+    console.log(`✅ Utilizador autenticado via Google: ${user.name} (${user.role})`);
     res.status(200).json({
       message: 'Sucesso!',
       user,

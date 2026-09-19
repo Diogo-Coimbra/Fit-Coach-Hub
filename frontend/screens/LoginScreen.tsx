@@ -64,11 +64,15 @@ export default function LoginScreen() {
   useEffect(() => {
     if (response?.type === 'success') {
       const { authentication } = response;
-      const idTokenFinal = authentication?.idToken || response.params?.id_token;
+      const tokenToSend =
+        authentication?.idToken ||
+        response.params?.id_token ||
+        authentication?.accessToken ||
+        response.params?.access_token;
 
-      if (idTokenFinal) {
+      if (tokenToSend) {
         setIsSubmitting(true);
-        api.post('/api/auth/google', { token: idTokenFinal, role: roleToRegister })
+        api.post('/api/auth/google', { token: tokenToSend, role: roleToRegister })
           .then((data) => {
             if (data.user) {
               login(data.user, data.token, data.coach, data.trial);

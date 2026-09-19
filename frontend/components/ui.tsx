@@ -45,16 +45,32 @@ export function Screen({
 export function BackButton({
   onPress,
   label,
+  style,
 }: {
   onPress: () => void;
   label?: string;
+  style?: StyleProp<ViewStyle>;
 }) {
   const { colors } = useTheme();
-  const { t } = useLanguage();
   return (
-    <Pressable onPress={onPress} style={styles.back} hitSlop={8}>
-      <Ionicons name="chevron-back" size={20} color={colors.muted} />
-      <Text style={[styles.backLabel, { color: colors.muted }]}>{label ?? t('common.back')}</Text>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.backBtn,
+        label ? styles.backBtnWithLabel : styles.backBtnCircle,
+        {
+          backgroundColor: colors.surface2,
+          borderColor: colors.border,
+          opacity: pressed ? 0.7 : 1,
+        },
+        style,
+      ]}
+      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+    >
+      <Ionicons name="arrow-back" size={22} color={colors.text} />
+      {label ? (
+        <Text style={[styles.backLabel, { color: colors.text }]}>{label}</Text>
+      ) : null}
     </Pressable>
   );
 }
@@ -222,16 +238,29 @@ export function ProgressBar({ value }: { value: number }) {
 }
 
 const styles = StyleSheet.create({
-  back: {
-    flexDirection: 'row',
+  backBtn: {
     alignItems: 'center',
-    alignSelf: 'flex-start',
+    justifyContent: 'center',
+    marginTop: Platform.OS === 'android' ? 12 : 8,
     marginBottom: space.md,
-    gap: 2,
+    borderWidth: 1,
+    alignSelf: 'flex-start',
+  },
+  backBtnCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  backBtnWithLabel: {
+    flexDirection: 'row',
+    paddingHorizontal: 14,
+    height: 40,
+    borderRadius: 20,
+    gap: 6,
   },
   backLabel: {
-    fontSize: 15,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
   },
   title: {
     fontSize: 28,

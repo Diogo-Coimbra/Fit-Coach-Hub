@@ -9,6 +9,7 @@ import {
   Image,
   Alert,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -603,10 +604,15 @@ export default function DashboardScreen({ navigation }: any) {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.sectionTitle}>{t('dashboard.assignedWorkouts')}</Text>
+            <Text style={styles.studentWorkoutsTitle}>{t('dashboard.assignedWorkouts')}</Text>
 
             {availableRoutineTags.length > 0 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ justifyContent: 'center', flexGrow: 1 }}
+                style={{ marginBottom: 12 }}
+              >
                 <TouchableOpacity
                   style={[
                     styles.routineChip,
@@ -654,9 +660,12 @@ export default function DashboardScreen({ navigation }: any) {
         }
         ListEmptyComponent={
           isLoading ? null : (
-            <Text style={styles.empty}>
-              {t('dashboard.noWorkoutsAssigned')}
-            </Text>
+            <View style={styles.emptyWorkoutsContainer}>
+              <Ionicons name="barbell-outline" size={44} color={colors.muted} style={{ marginBottom: 10, opacity: 0.6 }} />
+              <Text style={styles.empty}>
+                {t('dashboard.noWorkoutsAssigned')}
+              </Text>
+            </View>
           )
         }
       />
@@ -674,6 +683,7 @@ const getStyles = (colors: ColorScheme) => StyleSheet.create({
   list: {
     paddingHorizontal: space.lg,
     paddingBottom: 40,
+    paddingTop: Platform.OS === 'android' ? 8 : 4,
   },
   header: {
     flexDirection: 'row',
@@ -821,6 +831,14 @@ const getStyles = (colors: ColorScheme) => StyleSheet.create({
     color: colors.text,
     fontSize: 18,
     fontWeight: '700',
+  },
+  studentWorkoutsTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 16,
+    marginBottom: 12,
   },
   sectionCount: {
     color: colors.muted,
@@ -1011,12 +1029,20 @@ const getStyles = (colors: ColorScheme) => StyleSheet.create({
     fontWeight: '700',
     marginTop: 4,
   },
+  emptyWorkoutsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 36,
+    paddingHorizontal: 20,
+    width: '100%',
+  },
   empty: {
     color: colors.muted,
     fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',
-    maxWidth: 280,
+    alignSelf: 'center',
+    maxWidth: 290,
   },
   inviteButton: {
     backgroundColor: colors.surface,

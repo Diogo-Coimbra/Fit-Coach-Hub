@@ -657,7 +657,7 @@ export default function ChatScreen({ route, navigation }: any) {
       >
         {/* Barra de Topo do Chat */}
         <View style={[styles.topBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-          <BackButton onPress={() => navigation.goBack()} />
+          <BackButton onPress={() => navigation.goBack()} style={{ marginTop: 0, marginBottom: 0 }} />
 
           <View style={styles.headerInfo}>
             <View style={[styles.avatarCircle, { backgroundColor: colors.accent + '25', borderColor: colors.accent }]}>
@@ -930,7 +930,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: space.md,
-    paddingVertical: space.sm,
+    paddingTop: Platform.OS === 'android' ? 12 : space.sm,
+    paddingBottom: space.sm,
     borderBottomWidth: 1,
   },
   headerInfo: {

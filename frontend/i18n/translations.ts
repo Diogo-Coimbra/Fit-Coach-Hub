@@ -235,6 +235,15 @@ export interface Translations {
     todayTotal: string;
     cannotAnalyze: string;
     cannotAnalyzeTips: string;
+    describeMeal: string;
+    describeMealTitle: string;
+    describeMealSub: string;
+    describeMealPlaceholder: string;
+    photoNotesPlaceholder: string;
+    photoNotesLabel: string;
+    calculateWithAI: string;
+    emptyDescriptionAlert: string;
+    confirmPhotoTitle: string;
   };
   assessment: {
     title: string;
@@ -825,8 +834,17 @@ export const translations: Record<Language, Translations> = {
       discard: 'Descartar',
       saveMeal: 'Guardar Refeição',
       todayTotal: 'Total de Hoje',
-      cannotAnalyze: 'Não foi possível analisar',
-      cannotAnalyzeTips: 'Fotografa o prato com boa iluminação e enquadramento.',
+      cannotAnalyze: 'Não foi possível analisar a refeição',
+      cannotAnalyzeTips: 'Fotografa o prato com boa iluminação ou descreve os alimentos em texto.',
+      describeMeal: 'Descrever',
+      describeMealTitle: 'Descrever Refeição',
+      describeMealSub: 'Indica o que comeste e quantidades aproximadas para a IA calcular calorias e macros.',
+      describeMealPlaceholder: 'Ex: 2 ovos mexidos, 2 fatias de pão integral com manteiga e 1 maçã...',
+      photoNotesPlaceholder: 'Ex: 150g de peito de frango, 200g de arroz cozido e 1 fio de azeite...',
+      photoNotesLabel: 'Pesos ou notas adicionais (opcional):',
+      calculateWithAI: 'Calcular Nutrição com IA ⚡',
+      emptyDescriptionAlert: 'Por favor, introduz uma descrição do que comeste antes de calcular.',
+      confirmPhotoTitle: 'Confirmar Fotografia',
     },
     assessment: {
       title: 'Avaliação Corporal',
@@ -1416,8 +1434,17 @@ export const translations: Record<Language, Translations> = {
       discard: 'Discard',
       saveMeal: 'Save Meal',
       todayTotal: 'Today\'s Total',
-      cannotAnalyze: 'Could not analyze',
-      cannotAnalyzeTips: 'Photograph the dish with good lighting and framing.',
+      cannotAnalyze: 'Could not analyze meal',
+      cannotAnalyzeTips: 'Photograph the dish with good lighting or describe the meal using text.',
+      describeMeal: 'Describe',
+      describeMealTitle: 'Describe Meal',
+      describeMealSub: 'Tell us what you ate and approximate portions for AI to calculate calories and macros.',
+      describeMealPlaceholder: 'E.g.: 2 scrambled eggs, 2 slices of whole wheat toast with butter and 1 apple...',
+      photoNotesPlaceholder: 'E.g.: 150g grilled chicken breast, 200g cooked rice and 1 drizzle of olive oil...',
+      photoNotesLabel: 'Weights or extra notes (optional):',
+      calculateWithAI: 'Calculate Nutrition with AI ⚡',
+      emptyDescriptionAlert: 'Please enter a description of what you ate before calculating.',
+      confirmPhotoTitle: 'Confirm Photograph',
     },
     assessment: {
       title: 'Body Assessment',
@@ -2007,8 +2034,17 @@ export const translations: Record<Language, Translations> = {
       discard: 'Descartar',
       saveMeal: 'Guardar Comida',
       todayTotal: 'Total de Hoy',
-      cannotAnalyze: 'No se pudo analizar',
-      cannotAnalyzeTips: 'Fotografía el plato con buena iluminación y encuadre.',
+      cannotAnalyze: 'No se pudo analizar la comida',
+      cannotAnalyzeTips: 'Fotografía el plato con buena iluminación o describe los alimentos por texto.',
+      describeMeal: 'Describir',
+      describeMealTitle: 'Describir Comida',
+      describeMealSub: 'Indica qué comiste y cantidades aproximadas para que la IA calcule calorías y macros.',
+      describeMealPlaceholder: 'Ej: 2 huevos revueltos, 2 tostadas de pan integral con mantequilla y 1 manzana...',
+      photoNotesPlaceholder: 'Ej: 150g de peito de pollo a la plancha, 200g de arroz cocido y un chorrito de aceite...',
+      photoNotesLabel: 'Pesos o notas adicionales (opcional):',
+      calculateWithAI: 'Calcular Nutrición con IA ⚡',
+      emptyDescriptionAlert: 'Por favor, introduce una descripción de lo que comiste antes de calcular.',
+      confirmPhotoTitle: 'Confirmar Fotografía',
     },
     assessment: {
       title: 'Evaluación Corporal',
@@ -2598,8 +2634,17 @@ export const translations: Record<Language, Translations> = {
       discard: 'Ignorer',
       saveMeal: 'Enregistrer le Repas',
       todayTotal: 'Total d\'Aujourd\'hui',
-      cannotAnalyze: 'Impossible d\'analyser',
-      cannotAnalyzeTips: 'Photographiez le plat avec un bon éclairage et cadrage.',
+      cannotAnalyze: 'Impossible d\'analyser le repas',
+      cannotAnalyzeTips: 'Photographiez le plat avec un bon éclairage ou décrivez les aliments par texte.',
+      describeMeal: 'Décrire',
+      describeMealTitle: 'Décrire le Repas',
+      describeMealSub: 'Indiquez ce que vous avez mangé et les portions approximatives pour le calcul par IA.',
+      describeMealPlaceholder: 'Ex : 2 œufs brouillés, 2 tartines de pain complet beurrées et 1 pomme...',
+      photoNotesPlaceholder: 'Ex : 150g de blanc de poulet, 200g de riz cuit et 1 filet d\'huile d\'olive...',
+      photoNotesLabel: 'Grammages ou notes supplémentaires (facultatif) :',
+      calculateWithAI: 'Calculer la Nutrition avec l\'IA ⚡',
+      emptyDescriptionAlert: 'Veuillez décrire ce que vous avez mangé avant de calculer.',
+      confirmPhotoTitle: 'Confirmer la Photographie',
     },
     assessment: {
       title: 'Évaluation Corporelle',

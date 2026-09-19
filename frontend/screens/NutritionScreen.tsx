@@ -7,9 +7,15 @@ import {
   ActivityIndicator,
   Modal,
   Image,
+  TextInput,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/useAuthStore';
 import { BackButton, Button, Card, ProgressBar, Screen, showAlert, Subtitle, Title } from '../components/ui';
 import { ColorScheme, radius, space } from '../theme';
@@ -20,7 +26,7 @@ import { useLanguage } from '../store/useLanguageStore';
 export default function NutritionScreen({ navigation }: any) {
   const { user } = useAuthStore();
   const { colors } = useTheme();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const styles = useMemo(() => getStyles(colors), [colors]);
   const [todayMeals, setTodayMeals] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,6 +34,13 @@ export default function NutritionScreen({ navigation }: any) {
   const [modalVisible, setModalVisible] = useState(false);
   const [aiResult, setAiResult] = useState<any>(null);
   const [tempImageUri, setTempImageUri] = useState<string | null>(null);
+
+  // Estados para notas adicionais em fotos e descrição por texto
+  const [pendingPhotoBase64, setPendingPhotoBase64] = useState<string | null>(null);
+  const [photoNotes, setPhotoNotes] = useState('');
+  const [isPhotoNotesModalVisible, setIsPhotoNotesModalVisible] = useState(false);
+  const [textDescription, setTextDescription] = useState('');
+  const [isTextModalVisible, setIsTextModalVisible] = useState(false);
 
   const goalCalories = user?.dailyCalories || 2500;
   const goalProtein = user?.dailyProtein || 150;
@@ -83,24 +96,54 @@ export default function NutritionScreen({ navigation }: any) {
       }
 
       setTempImageUri(asset.uri);
-      
-      // Envia a imagem para o servidor em paralelo com a análise da IA
-      if (base64) {
-        api.post('/api/uploads', { imageBase64: base64 })
-          .then((res) => {
-            if (res?.url) setTempImageUri(res.url);
-          })
-          .catch((err) => console.warn('Falha no upload da foto da refeição:', err));
-
-        analyzeImageWithAI(asset.base64!);
-      }
+      setPendingPhotoBase64(asset.base64 || null);
+      setPhotoNotes('');
+      setIsPhotoNotesModalVisible(true);
     }
   };
 
-  const analyzeImageWithAI = async (base64Image: string) => {
+  const handleConfirmPhotoAnalysis = () => {
+    if (!pendingPhotoBase64) return;
+    setIsPhotoNotesModalVisible(false);
+
+    // Faz upload da foto para Cloudinary em paralelo
+    api.post('/api/uploads', { imageBase64: pendingPhotoBase64 })
+      .then((res) => {
+        if (res?.url) setTempImageUri(res.url);
+      })
+      .catch((err) => console.warn('Falha no upload da foto da refeição:', err));
+
+    analyzeMealWithAI({
+      imageBase64: pendingPhotoBase64,
+      additionalNotes: photoNotes.trim() || undefined,
+      language,
+    });
+  };
+
+  const handleConfirmTextAnalysis = () => {
+    const cleanText = textDescription.trim();
+    if (!cleanText) {
+      showAlert(t('common.attention'), t('nutrition.emptyDescriptionAlert'));
+      return;
+    }
+
+    setIsTextModalVisible(false);
+    setTempImageUri(null);
+    analyzeMealWithAI({
+      description: cleanText,
+      language,
+    });
+  };
+
+  const analyzeMealWithAI = async (payload: {
+    imageBase64?: string;
+    additionalNotes?: string;
+    description?: string;
+    language?: string;
+  }) => {
     try {
       setIsAnalyzing(true);
-      const data = await api.post('/api/nutrition/analyze', { imageBase64: base64Image });
+      const data = await api.post('/api/nutrition/analyze', payload);
       setAiResult(data);
       setModalVisible(true);
     } catch (error: any) {
@@ -127,6 +170,9 @@ export default function NutritionScreen({ navigation }: any) {
       setModalVisible(false);
       setAiResult(null);
       setTempImageUri(null);
+      setPendingPhotoBase64(null);
+      setPhotoNotes('');
+      setTextDescription('');
       fetchTodayMeals();
     } catch (error: any) {
       console.error('Falha ao guardar refeição:', error);
@@ -196,13 +242,24 @@ export default function NutritionScreen({ navigation }: any) {
                 <Text style={styles.analyzingText}>{t('nutrition.analyzingFood')}</Text>
               </View>
             ) : (
-              <View style={styles.actions}>
-                <View style={{ flex: 1 }}>
-                  <Button title={t('nutrition.scanMeal')} icon="camera-outline" onPress={() => handlePickImage(true)} />
+              <View style={{ marginBottom: 24, gap: 10 }}>
+                <View style={styles.actions}>
+                  <View style={{ flex: 1 }}>
+                    <Button title={t('nutrition.scanMeal')} icon="camera-outline" onPress={() => handlePickImage(true)} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Button title={t('nutrition.galleryMeal')} variant="secondary" icon="image-outline" onPress={() => handlePickImage(false)} />
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Button title={t('nutrition.galleryMeal')} variant="secondary" icon="image-outline" onPress={() => handlePickImage(false)} />
-                </View>
+                <Button
+                  title={t('nutrition.describeMealTitle')}
+                  variant="secondary"
+                  icon="create-outline"
+                  onPress={() => {
+                    setTextDescription('');
+                    setIsTextModalVisible(true);
+                  }}
+                />
               </View>
             )}
 
@@ -215,11 +272,93 @@ export default function NutritionScreen({ navigation }: any) {
         }
       />
 
-      <Modal animationType="fade" transparent visible={modalVisible}>
+      {/* Modal de Confirmação de Fotografia e Notas Adicionais / Pesos */}
+      <Modal animationType="slide" transparent visible={isPhotoNotesModalVisible} onRequestClose={() => setIsPhotoNotesModalVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <View style={styles.overlay}>
+            <View style={styles.modal}>
+              <Text style={styles.modalTitle}>{t('nutrition.confirmPhotoTitle')}</Text>
+              {tempImageUri ? <Image source={{ uri: tempImageUri }} style={styles.preview} /> : null}
+
+              <Text style={[styles.inputLabel, { color: colors.text }]}>{t('nutrition.photoNotesLabel')}</Text>
+              <TextInput
+                style={[styles.modalTextInput, { backgroundColor: colors.bg, borderColor: colors.border, color: colors.text }]}
+                placeholder={t('nutrition.photoNotesPlaceholder')}
+                placeholderTextColor={colors.muted}
+                multiline
+                numberOfLines={3}
+                value={photoNotes}
+                onChangeText={setPhotoNotes}
+              />
+
+              <View style={styles.modalBtns}>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    title={t('common.cancel')}
+                    variant="secondary"
+                    onPress={() => {
+                      setIsPhotoNotesModalVisible(false);
+                      setPendingPhotoBase64(null);
+                      setTempImageUri(null);
+                    }}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button title={t('nutrition.calculateWithAI')} onPress={handleConfirmPhotoAnalysis} />
+                </View>
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Modal de Descrição de Refeição em Texto */}
+      <Modal animationType="slide" transparent visible={isTextModalVisible} onRequestClose={() => setIsTextModalVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <View style={styles.overlay}>
+            <View style={styles.modal}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Ionicons name="restaurant-outline" size={22} color={colors.accent} />
+                <Text style={styles.modalTitle}>{t('nutrition.describeMealTitle')}</Text>
+              </View>
+              <Text style={[styles.modalSubtitle, { color: colors.muted }]}>{t('nutrition.describeMealSub')}</Text>
+
+              <TextInput
+                style={[styles.modalTextInput, { backgroundColor: colors.bg, borderColor: colors.border, color: colors.text, minHeight: 90 }]}
+                placeholder={t('nutrition.describeMealPlaceholder')}
+                placeholderTextColor={colors.muted}
+                multiline
+                numberOfLines={4}
+                value={textDescription}
+                onChangeText={setTextDescription}
+                autoFocus
+              />
+
+              <View style={styles.modalBtns}>
+                <View style={{ flex: 1 }}>
+                  <Button title={t('common.cancel')} variant="secondary" onPress={() => setIsTextModalVisible(false)} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button title={t('nutrition.calculateWithAI')} onPress={handleConfirmTextAnalysis} />
+                </View>
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Modal de Estimativa e Confirmação da Refeição */}
+      <Modal animationType="fade" transparent visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
         <View style={styles.overlay}>
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>{t('nutrition.nutritionEstimate')}</Text>
-            {tempImageUri ? <Image source={{ uri: tempImageUri }} style={styles.preview} /> : null}
+            {tempImageUri ? (
+              <Image source={{ uri: tempImageUri }} style={styles.preview} />
+            ) : (
+              <View style={[styles.textMealBadge, { backgroundColor: colors.surface2, borderColor: colors.border }]}>
+                <Ionicons name="restaurant-outline" size={32} color={colors.accent} />
+              </View>
+            )}
             <Text style={styles.aiName}>{aiResult?.name}</Text>
             <Text style={styles.aiCal}>{aiResult?.calories} kcal</Text>
             <Text style={styles.aiMacros}>
@@ -252,7 +391,7 @@ const getStyles = (colors: ColorScheme) => StyleSheet.create({
   macroBox: { flex: 1, backgroundColor: colors.surface2, borderRadius: radius.sm, padding: 10 },
   macroLabel: { color: colors.muted, fontSize: 11, marginBottom: 4 },
   macroValue: { color: colors.text, fontSize: 13, fontWeight: '700' },
-  actions: { flexDirection: 'row', gap: 10, marginBottom: 24 },
+  actions: { flexDirection: 'row', gap: 10 },
   analyzing: {
     alignItems: 'center',
     marginBottom: 24,
@@ -290,8 +429,27 @@ const getStyles = (colors: ColorScheme) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  modalTitle: { fontSize: 20, fontWeight: '700', color: colors.text, marginBottom: 14 },
+  modalTitle: { fontSize: 19, fontWeight: '700', color: colors.text, marginBottom: 14 },
+  modalSubtitle: { fontSize: 13, lineHeight: 18, marginBottom: 12 },
+  inputLabel: { fontSize: 13, fontWeight: '600', marginBottom: 6 },
+  modalTextInput: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    padding: 12,
+    fontSize: 14,
+    marginBottom: 16,
+    textAlignVertical: 'top',
+  },
   preview: { width: '100%', height: 160, borderRadius: radius.md, marginBottom: 14 },
+  textMealBadge: {
+    width: '100%',
+    height: 90,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
   aiName: { fontSize: 18, fontWeight: '700', color: colors.text },
   aiCal: { fontSize: 24, fontWeight: '700', color: colors.accent, marginVertical: 6 },
   aiMacros: { color: colors.muted, fontSize: 14, marginBottom: 18 },

@@ -2750,52 +2750,83 @@ app.get('/api/nutrition/meals/:userId', authenticateToken, async (req: Authentic
   }
 });
 
-// Analisar imagem de comida com IA (POST) - Protegido
+// Analisar refeição com IA (Fotografia e/ou Descrição por Texto) - Protegido
 app.post('/api/nutrition/analyze', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { imageBase64 } = req.body;
+    const { imageBase64, additionalNotes, description, language } = req.body;
 
-    if (!imageBase64) {
-      return res.status(400).json({ error: 'Falta a imagem em Base64 para analisar.' });
+    if (!imageBase64 && !description && !additionalNotes) {
+      return res.status(400).json({ error: 'Por favor, fornece uma fotografia ou uma descrição da refeição para análise.' });
     }
 
     if (!process.env.GEMINI_API_KEY) {
       return res.status(500).json({ error: 'A GEMINI_API_KEY não está configurada no servidor.' });
     }
 
-    console.log('🤖 A enviar imagem para o modelo Gemini...');
-    const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const lang = (language || 'pt').toLowerCase();
+    const langInstruction = lang.startsWith('en')
+      ? 'Use English for the meal name.'
+      : lang.startsWith('es')
+      ? 'Use Spanish for the meal name.'
+      : lang.startsWith('fr')
+      ? 'Use French for the meal name.'
+      : 'Use Portuguese for the meal name.';
 
-    const prompt = `You are a nutrition expert. Analyze this food photo.
-    Estimate visible portions and return ONLY a valid JSON object.
-    No extra text and no markdown fences.
-    Use English for the meal name.
-    Use exactly this structure:
-    {
-      "name": "Descriptive meal name (e.g. Chicken steak with rice)",
-      "calories": estimated_integer,
-      "protein": estimated_protein_grams,
-      "carbs": estimated_carbs_grams,
-      "fat": estimated_fat_grams
-    }`;
+    let prompt = '';
+    const contentParts: any[] = [];
 
-    const imageParts = [
-      {
+    if (imageBase64) {
+      console.log('🤖 A analisar fotografia de refeição com Gemini...');
+      const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+      prompt = `You are an expert sports nutritionist and dietitian.
+Analyze this food photograph to identify the meal and estimate its nutritional values.
+${additionalNotes ? `The user specified additional details, weights, or ingredients: "${additionalNotes}". Prioritize and incorporate these user-specified quantities directly for maximum precision.` : ''}
+
+Estimate portions, total calories, and macronutrients accurately.
+${langInstruction}
+Return ONLY a valid JSON object without markdown formatting, code fences or explanations.
+{
+  "name": "Descriptive meal name in requested language",
+  "calories": estimated_integer_calories,
+  "protein": estimated_integer_protein_in_grams,
+  "carbs": estimated_integer_carbs_in_grams,
+  "fat": estimated_integer_fat_in_grams
+}`;
+
+      contentParts.push(prompt);
+      contentParts.push({
         inlineData: {
           data: cleanBase64,
           mimeType: 'image/jpeg',
         },
-      },
-    ];
+      });
+    } else {
+      console.log('🤖 A analisar descrição de refeição por texto com Gemini...');
+      const mealDesc = description || additionalNotes;
+      prompt = `You are an expert sports nutritionist and dietitian.
+The user described what they ate: "${mealDesc}".
+Analyze this meal description, identify ingredients and portions, and calculate the total calories and macronutrients with high accuracy.
+${langInstruction}
+Return ONLY a valid JSON object without markdown formatting, code fences or explanations.
+{
+  "name": "Descriptive meal name in requested language",
+  "calories": estimated_integer_calories,
+  "protein": estimated_integer_protein_in_grams,
+  "carbs": estimated_integer_carbs_in_grams,
+  "fat": estimated_integer_fat_in_grams
+}`;
 
-    const result = await model.generateContent([prompt, ...imageParts]);
+      contentParts.push(prompt);
+    }
+
+    const result = await model.generateContent(contentParts);
     const response = await result.response;
     const text = response.text();
 
     const nutritionData = extractAndParseJson(text);
     const sanitizedNutrition = {
-      name: String(nutritionData.name || 'Refeição').trim(),
+      name: String(nutritionData.name || (lang.startsWith('en') ? 'Meal' : 'Refeição')).trim(),
       calories: Math.max(0, Math.round(Number(nutritionData.calories) || 0)),
       protein: Math.max(0, Math.round(Number(nutritionData.protein) || 0)),
       carbs: Math.max(0, Math.round(Number(nutritionData.carbs) || 0)),
@@ -2806,7 +2837,7 @@ app.post('/api/nutrition/analyze', authenticateToken, async (req: AuthenticatedR
     res.status(200).json(sanitizedNutrition);
   } catch (error: any) {
     console.error('❌ Erro na análise de IA:', error);
-    res.status(500).json({ error: error.message || 'Não foi possível analisar a fotografia com precisão.' });
+    res.status(500).json({ error: error.message || 'Não foi possível analisar a refeição com precisão.' });
   }
 });
 

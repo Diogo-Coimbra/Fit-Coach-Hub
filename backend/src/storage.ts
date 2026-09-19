@@ -88,7 +88,11 @@ export async function saveUploadedImage(
   await fs.promises.writeFile(filePath, dataBuffer);
 
   const cleanHost = host.replace(/\/+$/, '');
-  const publicUrl = `${protocol}://${cleanHost}/uploads/${filename}`;
+  const actualProtocol =
+    protocol === 'https' || (!cleanHost.includes('localhost') && !cleanHost.includes('127.0.0.1'))
+      ? 'https'
+      : 'http';
+  const publicUrl = `${actualProtocol}://${cleanHost}/uploads/${filename}`;
 
   return {
     url: publicUrl,
@@ -98,7 +102,9 @@ export async function saveUploadedImage(
 }
 
 /**
- * Guarda ficheiros multimédia do chat (áudio, vídeo, imagem, documentos) em uploads/
+ * Guarda ficheiros multimédia do chat (áudio, vídeo, imagem, documentos).
+ * - Se o Cloudinary estiver configurado, envia diretamente para o Cloudinary (CDN segura HTTPS permanente).
+ * - Caso contrário, guarda em disco local na pasta uploads/.
  */
 export async function saveUploadedMedia(
   mediaBase64: string,
@@ -109,37 +115,88 @@ export async function saveUploadedMedia(
 ): Promise<SaveImageResult> {
   const matches = mediaBase64.match(/^data:([A-Za-z0-9\/\-+.]+);base64,(.+)$/);
   let ext = 'bin';
+  let mimeType = 'application/octet-stream';
   let dataBuffer: Buffer;
 
   if (matches && matches.length === 3) {
-    const mime = matches[1].toLowerCase();
+    mimeType = matches[1].toLowerCase();
     dataBuffer = Buffer.from(matches[2], 'base64');
-    if (mime.includes('image/png')) ext = 'png';
-    else if (mime.includes('image/webp')) ext = 'webp';
-    else if (mime.includes('image/jpeg') || mime.includes('image/jpg')) ext = 'jpg';
-    else if (mime.includes('video/mp4')) ext = 'mp4';
-    else if (mime.includes('video/webm')) ext = 'webm';
-    else if (mime.includes('video/quicktime')) ext = 'mov';
-    else if (mime.includes('audio/m4a') || mime.includes('audio/x-m4a')) ext = 'm4a';
-    else if (mime.includes('audio/mp3') || mime.includes('audio/mpeg')) ext = 'mp3';
-    else if (mime.includes('audio/webm')) ext = 'webm';
-    else if (mime.includes('audio/wav') || mime.includes('audio/x-wav')) ext = 'wav';
-    else if (mime.includes('pdf')) ext = 'pdf';
+    if (mimeType.includes('image/png')) ext = 'png';
+    else if (mimeType.includes('image/webp')) ext = 'webp';
+    else if (mimeType.includes('image/jpeg') || mimeType.includes('image/jpg')) ext = 'jpg';
+    else if (mimeType.includes('video/mp4')) ext = 'mp4';
+    else if (mimeType.includes('video/webm')) ext = 'webm';
+    else if (mimeType.includes('video/quicktime')) ext = 'mov';
+    else if (mimeType.includes('audio/m4a') || mimeType.includes('audio/x-m4a')) ext = 'm4a';
+    else if (mimeType.includes('audio/mp3') || mimeType.includes('audio/mpeg')) ext = 'mp3';
+    else if (mimeType.includes('audio/webm')) ext = 'webm';
+    else if (mimeType.includes('audio/wav') || mimeType.includes('audio/x-wav')) ext = 'wav';
+    else if (mimeType.includes('pdf')) ext = 'pdf';
   } else {
-    if (mediaType === 'VIDEO') ext = 'mp4';
-    else if (mediaType === 'AUDIO') ext = 'm4a';
-    else if (mediaType === 'IMAGE') ext = 'jpg';
-    else if (mediaType === 'FILE') ext = originalName?.split('.').pop() || 'dat';
+    if (mediaType === 'VIDEO') { ext = 'mp4'; mimeType = 'video/mp4'; }
+    else if (mediaType === 'AUDIO') { ext = 'm4a'; mimeType = 'audio/m4a'; }
+    else if (mediaType === 'IMAGE') { ext = 'jpg'; mimeType = 'image/jpeg'; }
+    else if (mediaType === 'FILE') { ext = originalName?.split('.').pop() || 'dat'; }
     dataBuffer = Buffer.from(mediaBase64.replace(/^data:[^;]+;base64,/, ''), 'base64');
   }
 
+  // 1. Tentar upload para Cloudinary caso as credenciais estejam configuradas
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+  if (cloudName && apiKey && apiSecret) {
+    try {
+      const timestamp = Math.round(Date.now() / 1000);
+      const signatureString = `folder=fit-ai-tracker&timestamp=${timestamp}${apiSecret}`;
+      const signature = crypto.createHash('sha1').update(signatureString).digest('hex');
+
+      const fileDataUri = mediaBase64.startsWith('data:')
+        ? mediaBase64
+        : `data:${mimeType};base64,${mediaBase64}`;
+
+      const formData = new URLSearchParams();
+      formData.append('file', fileDataUri);
+      formData.append('api_key', apiKey);
+      formData.append('timestamp', String(timestamp));
+      formData.append('signature', signature);
+      formData.append('folder', 'fit-ai-tracker');
+
+      // auto/upload deteta automaticamente o tipo de recurso (áudio, vídeo, imagem, ficheiro)
+      const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const result = (await response.json()) as any;
+        console.log(`☁️ [Cloud Storage] Multimédia (${mediaType}) guardada no Cloudinary: ${result.secure_url}`);
+        return {
+          url: result.secure_url,
+          filename: result.public_id || `cloud_${Date.now()}`,
+          storage: 'cloudinary',
+        };
+      } else {
+        const errText = await response.text();
+        console.warn('⚠️ [Cloud Storage] Resposta não-200 do Cloudinary para multimédia, a recorrer a armazenamento local:', errText);
+      }
+    } catch (cloudErr) {
+      console.warn('⚠️ [Cloud Storage] Falha ao contactar Cloudinary para multimédia, a recorrer a armazenamento local:', cloudErr);
+    }
+  }
+
+  // 2. Armazenamento local (uploads/) com garantia de protocolo seguro HTTPS em produção
   const prefix = mediaType.toLowerCase();
   const filename = `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
   const filePath = path.join(uploadsDir, filename);
   await fs.promises.writeFile(filePath, dataBuffer);
 
   const cleanHost = host.replace(/\/+$/, '');
-  const publicUrl = `${protocol}://${cleanHost}/uploads/${filename}`;
+  const actualProtocol =
+    protocol === 'https' || (!cleanHost.includes('localhost') && !cleanHost.includes('127.0.0.1'))
+      ? 'https'
+      : 'http';
+  const publicUrl = `${actualProtocol}://${cleanHost}/uploads/${filename}`;
 
   return {
     url: publicUrl,

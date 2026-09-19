@@ -23,6 +23,7 @@
     },
     "android": {
       "package": "com.diogocoimbra.fitcoachhub",
+      "usesCleartextTraffic": true,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#0B0D10",

@@ -25,6 +25,7 @@ import { sendPasswordResetEmail } from './email';
 import { renderLegalPage, privacyPolicyHtml, termsOfServiceHtml } from './legalPages';
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(
@@ -2499,7 +2500,19 @@ app.get('/api/chat/:targetUserId/messages', authenticateToken, async (req: Authe
       data: { isRead: true },
     });
 
-    res.status(200).json(messages);
+    const sanitizedMessages = messages.map((m) => {
+      if (
+        m.mediaUrl &&
+        m.mediaUrl.startsWith('http://') &&
+        !m.mediaUrl.includes('localhost') &&
+        !m.mediaUrl.includes('127.0.0.1')
+      ) {
+        return { ...m, mediaUrl: m.mediaUrl.replace('http://', 'https://') };
+      }
+      return m;
+    });
+
+    res.status(200).json(sanitizedMessages);
   } catch (error) {
     console.error('Erro ao obter mensagens do chat:', error);
     res.status(500).json({ error: 'Erro ao carregar histórico de mensagens.' });
@@ -2543,7 +2556,7 @@ app.post('/api/chat/:targetUserId/messages', authenticateToken, async (req: Auth
     let mediaUrl: string | null = null;
     if (mediaBase64 && mediaBase64.length > 20) {
       const host = req.get('host') || 'localhost:3000';
-      const protocol = req.protocol || 'http';
+      const protocol = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'http';
       const saved = await saveUploadedMedia(mediaBase64, host, protocol, mediaType || 'IMAGE', fileName);
       mediaUrl = saved.url;
     }

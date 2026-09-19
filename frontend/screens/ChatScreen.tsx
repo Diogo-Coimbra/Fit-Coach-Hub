@@ -132,6 +132,9 @@ export default function ChatScreen({ route, navigation }: any) {
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
       }
+      if (Platform.OS !== 'web' && audioRecorder.isRecording) {
+        audioRecorder.stop().catch(() => {});
+      }
     };
   }, []);
 
@@ -357,6 +360,12 @@ export default function ChatScreen({ route, navigation }: any) {
           playsInSilentMode: true,
         });
 
+        if (audioRecorder.isRecording) {
+          try {
+            await audioRecorder.stop();
+          } catch {}
+        }
+
         await audioRecorder.prepareToRecordAsync();
         audioRecorder.record();
 
@@ -376,6 +385,7 @@ export default function ChatScreen({ route, navigation }: any) {
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
     }
+    const currentDuration = recordingSeconds;
     setIsRecordingAudio(false);
 
     try {
@@ -384,12 +394,25 @@ export default function ChatScreen({ route, navigation }: any) {
           mediaRecorderRef.current.stop();
         }
       } else {
-        await audioRecorder.stop();
+        if (currentDuration < 1) {
+          try {
+            if (audioRecorder.isRecording) {
+              await audioRecorder.stop().catch(() => {});
+            }
+            await setAudioModeAsync({ allowsRecording: false }).catch(() => {});
+          } catch {}
+          showAlert(t('common.attention'), 'Nota de voz demasiado curta (mínimo 1 segundo).');
+          return;
+        }
+
+        const stopResult = await audioRecorder.stop();
         await setAudioModeAsync({
           allowsRecording: false,
+          playsInSilentMode: true,
+          shouldRouteThroughEarpiece: false,
         });
 
-        const uri = audioRecorder.uri || audioRecorder.getStatus()?.url;
+        const uri = audioRecorder.uri || (stopResult as any)?.url || audioRecorder.getStatus()?.url;
         if (uri) {
           const base64Data = await FileSystem.readAsStringAsync(uri, {
             encoding: FileSystem.EncodingType.Base64,
@@ -397,6 +420,8 @@ export default function ChatScreen({ route, navigation }: any) {
           const formattedBase64 = `data:audio/m4a;base64,${base64Data}`;
           const fileName = `audio_${Date.now()}.m4a`;
           await handleSendMessage(undefined, formattedBase64, 'AUDIO', fileName);
+        } else {
+          console.warn('Gravação de áudio terminada mas sem URI válido disponível.');
         }
       }
     } catch (err) {
@@ -472,8 +497,19 @@ export default function ChatScreen({ route, navigation }: any) {
         }
       }
 
+      // Assegurar URL com protocolo HTTPS em produção
+      let secureAudioUrl = audioUrl;
+      if (
+        secureAudioUrl.startsWith('http://') &&
+        !secureAudioUrl.includes('localhost') &&
+        !secureAudioUrl.includes('127.0.0.1') &&
+        !secureAudioUrl.includes('10.0.2.2')
+      ) {
+        secureAudioUrl = secureAudioUrl.replace('http://', 'https://');
+      }
+
       if (Platform.OS === 'web') {
-        const audio = new (window as any).Audio(audioUrl);
+        const audio = new (window as any).Audio(secureAudioUrl);
         webAudioRef.current = audio;
         setPlayingMsgId(msgId);
         audio.onended = () => {
@@ -489,10 +525,25 @@ export default function ChatScreen({ route, navigation }: any) {
         await setAudioModeAsync({
           allowsRecording: false,
           playsInSilentMode: true,
+          interruptionMode: 'doNotMix',
+          shouldRouteThroughEarpiece: false,
         });
-        const player = createAudioPlayer(audioUrl);
+        const player = createAudioPlayer(secureAudioUrl);
         currentPlayerRef.current = player;
         const subscription = (player as any).addListener('playbackStatusUpdate', (status: any) => {
+          if (status.error) {
+            console.warn('Erro no playbackStatusUpdate:', status.error);
+            setPlayingMsgId(null);
+            subscription?.remove();
+            try {
+              player.remove();
+            } catch {}
+            if (currentPlayerRef.current === player) {
+              currentPlayerRef.current = null;
+            }
+            showAlert(t('common.error'), 'Não foi possível reproduzir a nota de voz.');
+            return;
+          }
           if (status.didJustFinish) {
             setPlayingMsgId(null);
             subscription?.remove();

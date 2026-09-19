@@ -19,6 +19,8 @@ import { BackButton, Button, Card, Screen, showAlert, Title } from '../component
 import { ColorScheme, radius, space } from '../theme';
 import { api } from '../services/api';
 import SubscriptionPaywallModal from '../components/SubscriptionPaywallModal';
+import PrivacyTermsModal from '../components/PrivacyTermsModal';
+import { LineChart } from '../components/LineChart';
 import { useTheme } from '../store/useThemeStore';
 import { useLanguage } from '../store/useLanguageStore';
 
@@ -39,21 +41,30 @@ export default function ProfileScreen({ navigation }: any) {
   const [weightInput, setWeightInput] = useState('');
   const [weightHistory, setWeightHistory] = useState<any[]>([]);
   const [isSavingWeight, setIsSavingWeight] = useState(false);
+  const [analytics, setAnalytics] = useState<{ weightHistory: any[]; strengthHistory: any[] } | null>(null);
+  const [selectedExerciseName, setSelectedExerciseName] = useState<string>('');
 
   // Código de associação para alunos
   const [inviteCodeInput, setInviteCodeInput] = useState('');
   const [isLinkingCoach, setIsLinkingCoach] = useState(false);
   const [isSwitchingRole, setIsSwitchingRole] = useState(false);
   const [showPaywallModal, setShowPaywallModal] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   const fetchProfileData = async () => {
     if (!user?.id) return;
     try {
-      const [weights, meData] = await Promise.all([
+      const [weights, meData, analyticsData] = await Promise.all([
         api.get(`/api/metrics/weight/${user.id}`),
         api.get('/api/auth/me'),
+        api.get(`/api/analytics/progress/${user.id}`).catch(() => null),
       ]);
       setWeightHistory(weights || []);
+      setAnalytics(analyticsData);
+      if (analyticsData?.strengthHistory?.length > 0 && !selectedExerciseName) {
+        setSelectedExerciseName(analyticsData.strengthHistory[0].exerciseName);
+      }
       if (meData?.coach) setCoach(meData.coach);
       if (meData?.trial) setTrial(meData.trial);
       if (meData?.user) setUser(meData.user);
@@ -259,6 +270,33 @@ export default function ProfileScreen({ navigation }: any) {
     } catch (err: any) {
       Alert.alert(t('profile.stripePortal'), err.message || t('common.error'));
     }
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Eliminar Conta Permanentemente',
+      'Tens a certeza absoluta que pretendes eliminar a tua conta? Esta ação é irreversível e apagará definitivamente todos os teus treinos, check-ins, fotos de evolução e mensagens.',
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: 'Sim, Eliminar Definitivamente',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsDeletingAccount(true);
+              await api.delete('/api/users/me');
+              showAlert('Conta Eliminada', 'A tua conta e todos os dados foram eliminados com sucesso.');
+              logout();
+            } catch (err: any) {
+              console.error('Erro ao eliminar conta:', err);
+              showAlert(t('common.error'), err.message || 'Não foi possível eliminar a conta.');
+            } finally {
+              setIsDeletingAccount(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const formatDate = (dateString: string) => {
@@ -605,6 +643,88 @@ export default function ProfileScreen({ navigation }: any) {
           </Card>
         )}
 
+        {/* Gráficos de Evolução Corporal & Cargas (1RM) */}
+        <Card style={styles.block}>
+          <Text style={styles.blockTitle}>📈 {t('analytics.chartsTitle')}</Text>
+          <Text style={styles.blockSub}>{t('analytics.chartsSubtitle')}</Text>
+
+          {/* Gráfico 1: Peso Corporal */}
+          <View style={{ marginTop: 10, marginBottom: 16 }}>
+            <LineChart
+              title={t('analytics.weightEvolution')}
+              unit="kg"
+              data={
+                analytics?.weightHistory?.map((w) => ({
+                  date: w.date,
+                  value: w.weight,
+                })) || []
+              }
+              color={colors.accent}
+              height={190}
+              emptyText={t('analytics.weightEmptyPrompt')}
+            />
+          </View>
+
+          {/* Gráfico 2: Carga Máxima & 1RM */}
+          {analytics?.strengthHistory && analytics.strengthHistory.length > 0 ? (
+            <View style={{ marginTop: 8 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {analytics.strengthHistory.map((ex) => {
+                    const isSelected = selectedExerciseName === ex.exerciseName;
+                    return (
+                      <TouchableOpacity
+                        key={ex.exerciseName}
+                        onPress={() => setSelectedExerciseName(ex.exerciseName)}
+                        style={[
+                          styles.exerciseChip,
+                          {
+                            backgroundColor: isSelected ? colors.accent : colors.surface2,
+                            borderColor: isSelected ? colors.accent : colors.border,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.exerciseChipText,
+                            { color: isSelected ? colors.bg : colors.text, fontWeight: isSelected ? '700' : '500' },
+                          ]}
+                        >
+                          {ex.exerciseName} ({ex.dataPointsCount})
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+
+              {(() => {
+                const currentEx =
+                  analytics.strengthHistory.find((e) => e.exerciseName === selectedExerciseName) ||
+                  analytics.strengthHistory[0];
+
+                const chartPoints =
+                  currentEx?.sessions.map((s: any) => ({
+                    date: s.date,
+                    value: s.estimated1RM,
+                    extra: `${s.maxWeight}kg x ${s.reps}`,
+                  })) || [];
+
+                return (
+                  <LineChart
+                    title={`${t('analytics.estimated1RM')}: ${currentEx?.exerciseName || ''}`}
+                    unit="kg"
+                    data={chartPoints}
+                    color="#10B981"
+                    height={190}
+                    emptyText={t('analytics.strengthEmptyPrompt')}
+                  />
+                );
+              })()}
+            </View>
+          ) : null}
+        </Card>
+
         {/* Histórico de Peso */}
         <Card style={styles.block}>
           <Text style={styles.blockTitle}>{t('profile.weightLogTitle')}</Text>
@@ -633,25 +753,75 @@ export default function ProfileScreen({ navigation }: any) {
           ))}
         </Card>
 
-        {/* Botão de Alternar Papel (Modo Dev / Switch Role) */}
+        {/* Botão de Alternar Papel (Apenas em Modo de Desenvolvimento / Dev Mode) */}
+        {__DEV__ ? (
+          <TouchableOpacity
+            style={styles.switchRoleBtn}
+            onPress={handleSwitchRole}
+            disabled={isSwitchingRole}
+          >
+            <Ionicons name="swap-horizontal" size={18} color={colors.accent} />
+            <Text style={styles.switchRoleText}>
+              [DEV] {isCoach ? t('profile.switchToClient') : t('profile.switchToCoach')}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
+        {/* Termos de Uso e Política de Privacidade */}
         <TouchableOpacity
-          style={styles.switchRoleBtn}
-          onPress={handleSwitchRole}
-          disabled={isSwitchingRole}
+          style={[styles.termsBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          onPress={() => setShowTermsModal(true)}
+          activeOpacity={0.8}
         >
-          <Ionicons name="swap-horizontal" size={18} color={colors.accent} />
-          <Text style={styles.switchRoleText}>
-            {isCoach ? t('profile.switchToClient') : t('profile.switchToCoach')}
+          <Ionicons name="shield-checkmark-outline" size={18} color={colors.accent} />
+          <Text style={[styles.termsBtnText, { color: colors.text }]}>
+            Termos de Uso & Política de Privacidade (RGPD)
           </Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.muted} />
         </TouchableOpacity>
 
-        <Button title={t('profile.logoutBtn')} variant="danger" onPress={() => logout()} />
+        {/* Terminar Sessão */}
+        <View style={{ marginTop: 14 }}>
+          <Button title={t('profile.logoutBtn')} variant="secondary" onPress={() => logout()} />
+        </View>
+
+        {/* Zona de Eliminação de Conta (Diretriz Apple 5.1.1(v)) */}
+        <View style={[styles.dangerZone, { borderColor: 'rgba(239, 68, 68, 0.3)', backgroundColor: 'rgba(239, 68, 68, 0.05)' }]}>
+          <Text style={[styles.dangerZoneTitle, { color: colors.danger }]}>
+            Gestão de Conta & Privacidade
+          </Text>
+          <Text style={[styles.dangerZoneSub, { color: colors.muted }]}>
+            Podes eliminar permanentemente a tua conta e todos os teus dados (treinos, fotos de evolução, check-ins e mensagens).
+          </Text>
+          <TouchableOpacity
+            style={[styles.deleteAccountBtn, { borderColor: colors.danger }]}
+            onPress={handleDeleteAccount}
+            disabled={isDeletingAccount}
+          >
+            {isDeletingAccount ? (
+              <ActivityIndicator color={colors.danger} size="small" />
+            ) : (
+              <>
+                <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                <Text style={[styles.deleteAccountBtnText, { color: colors.danger }]}>
+                  Eliminar a Minha Conta
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
 
         {/* Modal de Subscrição Stripe */}
         <SubscriptionPaywallModal
           visible={showPaywallModal}
           canDismiss={true}
           onDismiss={() => setShowPaywallModal(false)}
+        />
+
+        {/* Modal de Termos de Uso e Privacidade */}
+        <PrivacyTermsModal
+          visible={showTermsModal}
+          onClose={() => setShowTermsModal(false)}
         />
       </ScrollView>
     </Screen>
@@ -1033,5 +1203,58 @@ const getStyles = (colors: ColorScheme) => StyleSheet.create({
     color: colors.text,
     fontSize: 13,
     fontWeight: '600',
+  },
+  exerciseChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radius.full,
+    borderWidth: 1,
+  },
+  exerciseChipText: {
+    fontSize: 12,
+  },
+  termsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    marginTop: 18,
+    gap: 10,
+  },
+  termsBtnText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  dangerZone: {
+    marginTop: 24,
+    padding: 16,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    gap: 8,
+  },
+  dangerZoneTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  dangerZoneSub: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  deleteAccountBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    marginTop: 6,
+    gap: 8,
+  },
+  deleteAccountBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

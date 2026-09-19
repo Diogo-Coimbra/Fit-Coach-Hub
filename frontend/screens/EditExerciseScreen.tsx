@@ -14,6 +14,7 @@ export default function EditExerciseScreen({ route, navigation }: any) {
   const [weight, setWeight] = useState(exercise.weight ? exercise.weight.toString() : '');
   const [restSeconds, setRestSeconds] = useState(exercise.restSeconds ? exercise.restSeconds.toString() : '90');
   const [notes, setNotes] = useState(exercise.notes || '');
+  const [videoUrl, setVideoUrl] = useState(exercise.videoUrl || '');
   const [isSaving, setIsSaving] = useState(false);
 
   const handleUpdate = async () => {
@@ -32,6 +33,7 @@ export default function EditExerciseScreen({ route, navigation }: any) {
         weight: weight ? parseFloat(weight.replace(',', '.')) : null,
         restSeconds: parseInt(restSeconds) || 90,
         notes: notes.trim() || undefined,
+        videoUrl: videoUrl.trim() || null,
       });
 
       navigation.goBack();
@@ -98,6 +100,14 @@ export default function EditExerciseScreen({ route, navigation }: any) {
               />
             </View>
           </View>
+
+          <Field
+            label="Link de Vídeo / GIF Demonstrativo"
+            value={videoUrl}
+            onChangeText={setVideoUrl}
+            placeholder="https://youtube.com/watch?v=... ou link direto .mp4 / .gif"
+            autoCapitalize="none"
+          />
 
           <Field
             label={t('workouts.notesLabel')}

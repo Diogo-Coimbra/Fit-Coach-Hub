@@ -96,3 +96,54 @@ export async function saveUploadedImage(
     storage: 'local',
   };
 }
+
+/**
+ * Guarda ficheiros multimédia do chat (áudio, vídeo, imagem, documentos) em uploads/
+ */
+export async function saveUploadedMedia(
+  mediaBase64: string,
+  host: string,
+  protocol: string = 'http',
+  mediaType: string = 'FILE',
+  originalName?: string
+): Promise<SaveImageResult> {
+  const matches = mediaBase64.match(/^data:([A-Za-z0-9\/\-+.]+);base64,(.+)$/);
+  let ext = 'bin';
+  let dataBuffer: Buffer;
+
+  if (matches && matches.length === 3) {
+    const mime = matches[1].toLowerCase();
+    dataBuffer = Buffer.from(matches[2], 'base64');
+    if (mime.includes('image/png')) ext = 'png';
+    else if (mime.includes('image/webp')) ext = 'webp';
+    else if (mime.includes('image/jpeg') || mime.includes('image/jpg')) ext = 'jpg';
+    else if (mime.includes('video/mp4')) ext = 'mp4';
+    else if (mime.includes('video/webm')) ext = 'webm';
+    else if (mime.includes('video/quicktime')) ext = 'mov';
+    else if (mime.includes('audio/m4a') || mime.includes('audio/x-m4a')) ext = 'm4a';
+    else if (mime.includes('audio/mp3') || mime.includes('audio/mpeg')) ext = 'mp3';
+    else if (mime.includes('audio/webm')) ext = 'webm';
+    else if (mime.includes('audio/wav') || mime.includes('audio/x-wav')) ext = 'wav';
+    else if (mime.includes('pdf')) ext = 'pdf';
+  } else {
+    if (mediaType === 'VIDEO') ext = 'mp4';
+    else if (mediaType === 'AUDIO') ext = 'm4a';
+    else if (mediaType === 'IMAGE') ext = 'jpg';
+    else if (mediaType === 'FILE') ext = originalName?.split('.').pop() || 'dat';
+    dataBuffer = Buffer.from(mediaBase64.replace(/^data:[^;]+;base64,/, ''), 'base64');
+  }
+
+  const prefix = mediaType.toLowerCase();
+  const filename = `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+  const filePath = path.join(uploadsDir, filename);
+  await fs.promises.writeFile(filePath, dataBuffer);
+
+  const cleanHost = host.replace(/\/+$/, '');
+  const publicUrl = `${protocol}://${cleanHost}/uploads/${filename}`;
+
+  return {
+    url: publicUrl,
+    filename,
+    storage: 'local',
+  };
+}

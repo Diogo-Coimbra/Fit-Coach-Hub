@@ -20,11 +20,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { Card, Screen } from '../components/ui';
 import { ColorScheme, radius, space } from '../theme';
 import { api } from '../services/api';
+import { LineChart, ChartDataPoint } from '../components/LineChart';
+import { useAuthStore } from '../store/useAuthStore';
 import { useTheme } from '../store/useThemeStore';
 import { useLanguage } from '../store/useLanguageStore';
+import PhotoCompareModal from '../components/PhotoCompareModal';
+import { generateAndShareCoachReportPDF } from '../utils/pdfReport';
 
 export default function ClientDetailsScreen({ route, navigation }: any) {
   const { clientId } = route.params;
+  const { user } = useAuthStore();
   const { colors, mode } = useTheme();
   const { t, language } = useLanguage();
   const styles = useMemo(() => getStyles(colors), [colors]);
@@ -33,7 +38,22 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
 
   const [client, setClient] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'workouts' | 'history' | 'nutrition' | 'weight'>('workouts');
+  const [activeTab, setActiveTab] = useState<'workouts' | 'history' | 'nutrition' | 'weight' | 'checkins' | 'charts'>('workouts');
+
+  // Relatório PDF
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
+
+  // Modal de Comparador de Fotos Antes & Depois
+  const [isPhotoCompareVisible, setIsPhotoCompareVisible] = useState(false);
+
+  // Check-ins Semanais do Aluno
+  const [checkIns, setCheckIns] = useState<any[]>([]);
+  const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>({});
+  const [isSendingFeedback, setIsSendingFeedback] = useState<Record<string, boolean>>({});
+
+  // Gráficos de Evolução (Peso e 1RM)
+  const [analytics, setAnalytics] = useState<{ weightHistory: any[]; strengthHistory: any[] } | null>(null);
+  const [selectedExerciseName, setSelectedExerciseName] = useState<string>('');
 
   // Modal: Atribuir a partir de Modelo
   const [isTemplateModalVisible, setIsTemplateModalVisible] = useState(false);
@@ -66,8 +86,17 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
   const fetchClientDetails = useCallback(async () => {
     try {
       setIsLoading(true);
-      const data = await api.get(`/api/coach/clients/${clientId}`);
+      const [data, checkInsData, analyticsData] = await Promise.all([
+        api.get(`/api/coach/clients/${clientId}`),
+        api.get(`/api/checkins/client/${clientId}`).catch(() => []),
+        api.get(`/api/analytics/progress/${clientId}`).catch(() => null),
+      ]);
       setClient(data);
+      setCheckIns(checkInsData || []);
+      setAnalytics(analyticsData);
+      if (analyticsData?.strengthHistory?.length > 0) {
+        setSelectedExerciseName(analyticsData.strengthHistory[0].exerciseName);
+      }
     } catch (error: any) {
       console.error('Erro ao carregar detalhes do aluno:', error);
       Alert.alert(t('common.error'), error.message || t('common.error'));
@@ -75,6 +104,127 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
       setIsLoading(false);
     }
   }, [clientId, t]);
+
+  const handleSendFeedback = async (checkInId: string) => {
+    const feedback = feedbackDrafts[checkInId]?.trim();
+    if (!feedback) {
+      Alert.alert(t('common.attention'), 'Por favor, escreve algum feedback antes de enviar.');
+      return;
+    }
+
+    try {
+      setIsSendingFeedback((prev) => ({ ...prev, [checkInId]: true }));
+      const updated = await api.patch(`/api/checkins/${checkInId}/feedback`, { coachFeedback: feedback });
+      setCheckIns((prev) =>
+        prev.map((c) =>
+          c.id === checkInId
+            ? { ...c, coachFeedback: updated.coachFeedback, reviewedAt: updated.reviewedAt }
+            : c
+        )
+      );
+      Alert.alert(t('common.success'), 'Feedback enviado com sucesso! O teu aluno foi notificado via push.');
+    } catch (err: any) {
+      Alert.alert(t('common.error'), err.message || 'Erro ao submeter feedback.');
+    } finally {
+      setIsSendingFeedback((prev) => ({ ...prev, [checkInId]: false }));
+    }
+  };
+
+  const handleSendPushReminder = async () => {
+    Alert.alert(
+      'Enviar Alerta de Lembrete',
+      `Desejas enviar uma notificação push para ${client?.name || 'o aluno'} a incentivar o treino?`,
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: 'Enviar 🔔',
+          onPress: async () => {
+            try {
+              await api.post('/api/coach/notify-inactive', { clientId });
+              Alert.alert(t('common.success'), `Notificação enviada com sucesso a ${client?.name}!`);
+            } catch (err: any) {
+              Alert.alert(t('common.error'), err.message || 'Erro ao enviar notificação.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleExportPDF = async () => {
+    try {
+      setIsExportingPDF(true);
+
+      const sortedCheckIns = [...checkIns].sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+
+      const earliestCheckIn = sortedCheckIns.find(
+        (c) => c.frontPhotoUrl || c.backPhotoUrl || c.sidePhotoUrl
+      );
+      const latestCheckIn = [...sortedCheckIns].reverse().find(
+        (c) => c.frontPhotoUrl || c.backPhotoUrl || c.sidePhotoUrl
+      );
+
+      const beforePhotoUrl =
+        earliestCheckIn?.frontPhotoUrl ||
+        earliestCheckIn?.sidePhotoUrl ||
+        earliestCheckIn?.backPhotoUrl ||
+        null;
+      const afterPhotoUrl =
+        latestCheckIn && latestCheckIn.id !== earliestCheckIn?.id
+          ? latestCheckIn?.frontPhotoUrl ||
+            latestCheckIn?.sidePhotoUrl ||
+            latestCheckIn?.backPhotoUrl ||
+            null
+          : null;
+
+      const beforeDate = earliestCheckIn
+        ? new Date(earliestCheckIn.createdAt).toLocaleDateString(currentLocale)
+        : undefined;
+      const afterDate =
+        latestCheckIn && latestCheckIn.id !== earliestCheckIn?.id
+          ? new Date(latestCheckIn.createdAt).toLocaleDateString(currentLocale)
+          : undefined;
+
+      const currentWeight = client?.bodyMetrics?.[0]?.weight || checkIns[0]?.weight || '--';
+      const initialWeight =
+        sortedCheckIns[0]?.weight ||
+        client?.bodyMetrics?.[client?.bodyMetrics?.length - 1]?.weight ||
+        currentWeight;
+      let weightDelta: string | number | undefined = undefined;
+      if (typeof currentWeight === 'number' && typeof initialWeight === 'number') {
+        weightDelta = Number((currentWeight - initialWeight).toFixed(1));
+      }
+
+      await generateAndShareCoachReportPDF({
+        coachName: user?.name || 'Treinador',
+        coachBrandName: (user as any)?.coachBrandName || null,
+        coachLogoUrl: (user as any)?.coachLogoUrl || null,
+        coachPhone: (user as any)?.coachPhone || null,
+        clientName: client?.name || 'Aluno',
+        clientEmail: client?.email || '',
+        currentWeight,
+        initialWeight,
+        weightDelta,
+        totalWorkouts: client?.workouts?.length || 0,
+        currentStreak: client?.currentStreak || 0,
+        bodyFat: client?.bodyMetrics?.[0]?.bodyFat,
+        beforePhotoUrl,
+        afterPhotoUrl,
+        beforeDate,
+        afterDate,
+        coachNotes:
+          client?.coachNotes ||
+          'Excelente consistência e evolução postural demonstrada ao longo do período de acompanhamento.',
+      });
+    } catch (err: any) {
+      console.error('Erro ao gerar relatório PDF:', err);
+      Alert.alert(t('common.error'), 'Não foi possível gerar o relatório PDF.');
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -307,9 +457,37 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.topTitle}>{t('clientDetails.studentFile')}</Text>
-          <TouchableOpacity onPress={handleRemoveClient} style={styles.backBtn}>
-            <Ionicons name="trash-outline" size={22} color={colors.danger} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <TouchableOpacity
+              onPress={handleExportPDF}
+              style={styles.backBtn}
+              disabled={isExportingPDF}
+            >
+              {isExportingPDF ? (
+                <ActivityIndicator size="small" color={colors.accent} />
+              ) : (
+                <Ionicons name="document-text-outline" size={22} color={colors.accent} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate('Chat', {
+                  targetUserId: clientId,
+                  targetUserName: client?.name || 'Aluno',
+                  targetUserRole: 'Aluno',
+                })
+              }
+              style={styles.backBtn}
+            >
+              <Ionicons name="chatbubble-ellipses-outline" size={22} color={colors.accent} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleSendPushReminder} style={styles.backBtn}>
+              <Ionicons name="notifications-outline" size={22} color={colors.accent} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleRemoveClient} style={styles.backBtn}>
+              <Ionicons name="trash-outline" size={22} color={colors.danger} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Cartão de Perfil do Aluno */}
@@ -348,42 +526,62 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
         </Card>
 
         {/* Separadores de Navegação */}
-        <View style={styles.tabs}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'workouts' && styles.tabActive]}
-            onPress={() => setActiveTab('workouts')}
-          >
-            <Text style={[styles.tabText, activeTab === 'workouts' && styles.tabTextActive]}>
-              {t('clientDetails.tabWorkouts')} ({client?.workouts?.length || 0})
-            </Text>
-          </TouchableOpacity>
+        <View style={{ marginBottom: 12 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScrollContent}>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'workouts' && styles.tabActive]}
+              onPress={() => setActiveTab('workouts')}
+            >
+              <Text style={[styles.tabText, activeTab === 'workouts' && styles.tabTextActive]}>
+                {t('clientDetails.tabWorkouts')} ({client?.workouts?.length || 0})
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'history' && styles.tabActive]}
-            onPress={() => setActiveTab('history')}
-          >
-            <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>
-              {t('clientDetails.tabHistory')}
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'history' && styles.tabActive]}
+              onPress={() => setActiveTab('history')}
+            >
+              <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>
+                {t('clientDetails.tabHistory')}
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'nutrition' && styles.tabActive]}
-            onPress={() => setActiveTab('nutrition')}
-          >
-            <Text style={[styles.tabText, activeTab === 'nutrition' && styles.tabTextActive]}>
-              {t('clientDetails.tabNutrition')}
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'checkins' && styles.tabActive]}
+              onPress={() => setActiveTab('checkins')}
+            >
+              <Text style={[styles.tabText, activeTab === 'checkins' && styles.tabTextActive]}>
+                📋 {t('checkin.tabTitle')} ({checkIns.length})
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'weight' && styles.tabActive]}
-            onPress={() => setActiveTab('weight')}
-          >
-            <Text style={[styles.tabText, activeTab === 'weight' && styles.tabTextActive]}>
-              {t('clientDetails.tabAssessment')} ({client?.bodyMetrics?.length || 0})
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'charts' && styles.tabActive]}
+              onPress={() => setActiveTab('charts')}
+            >
+              <Text style={[styles.tabText, activeTab === 'charts' && styles.tabTextActive]}>
+                📈 {t('analytics.chartsTitle')}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'nutrition' && styles.tabActive]}
+              onPress={() => setActiveTab('nutrition')}
+            >
+              <Text style={[styles.tabText, activeTab === 'nutrition' && styles.tabTextActive]}>
+                {t('clientDetails.tabNutrition')}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'weight' && styles.tabActive]}
+              onPress={() => setActiveTab('weight')}
+            >
+              <Text style={[styles.tabText, activeTab === 'weight' && styles.tabTextActive]}>
+                {t('clientDetails.tabAssessment')} ({client?.bodyMetrics?.length || 0})
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
 
         {/* SEPARADOR 1: TREINOS ATRIBUÍDOS */}
@@ -679,6 +877,286 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
               }
             />
           </View>
+        )}
+
+        {/* SEPARADOR 5: CHECK-INS SEMANAIS DO ALUNO */}
+        {activeTab === 'checkins' && (
+          <View style={{ flex: 1 }}>
+            <View style={styles.actionHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.tabSectionTitle}>Check-ins Semanais do Aluno</Text>
+                <Text style={{ color: colors.muted, fontSize: 12 }}>
+                  Formulários enviados pelo aluno com peso em jejum, fotos e feedback
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: colors.accent,
+                  paddingHorizontal: 12,
+                  paddingVertical: 7,
+                  borderRadius: radius.full,
+                  gap: 6,
+                }}
+                onPress={() => setIsPhotoCompareVisible(true)}
+              >
+                <Ionicons name="images-outline" size={16} color={colors.bg} />
+                <Text style={{ color: colors.bg, fontSize: 13, fontWeight: '700' }}>Antes & Depois 📸</Text>
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={checkIns}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ paddingBottom: 40 }}
+              renderItem={({ item }) => {
+                const date = new Date(item.createdAt).toLocaleDateString(currentLocale, {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+                });
+                const hasPhotos = Boolean(item.frontPhotoUrl || item.backPhotoUrl || item.sidePhotoUrl);
+                const hasPain = Boolean(typeof item.painLevel === 'number' && item.painLevel > 0);
+                const draft = feedbackDrafts[item.id] !== undefined ? feedbackDrafts[item.id] : (item.coachFeedback || '');
+                const isSending = !!isSendingFeedback[item.id];
+
+                return (
+                  <Card style={[styles.checkInAdminCard, { borderColor: hasPain ? '#EF4444' : colors.border }]}>
+                    {/* Linha de Cabeçalho do Check-in */}
+                    <View style={styles.checkInTopRow}>
+                      <View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Text style={styles.checkInAdminWeight}>{item.weight} kg</Text>
+                          <View style={styles.checkInDateBadge}>
+                            <Text style={styles.checkInDateText}>{date}</Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                        <View style={[styles.miniMetricBadge, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
+                          <Text style={[styles.miniMetricText, { color: '#10B981' }]}>
+                            Dieta: {item.dietAdherence}/10
+                          </Text>
+                        </View>
+                        <View style={[styles.miniMetricBadge, { backgroundColor: 'rgba(245, 158, 11, 0.15)' }]}>
+                          <Text style={[styles.miniMetricText, { color: '#F59E0B' }]}>
+                            Energia: {item.energyLevel}/10
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Alerta de Dor se existir */}
+                    {hasPain ? (
+                      <View style={styles.painAlertBox}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Ionicons name="warning" size={18} color="#EF4444" />
+                          <Text style={styles.painAlertTitle}>
+                            Alerta de Dor / Desconforto (Nível {item.painLevel}/10)
+                          </Text>
+                        </View>
+                        <Text style={styles.painAlertDesc}>
+                          {item.painNotes || 'O aluno reportou desconforto nesta semana sem detalhes adicionais.'}
+                        </Text>
+                      </View>
+                    ) : null}
+
+                    {/* Notas do Aluno */}
+                    {item.notes ? (
+                      <View style={styles.checkInNotesBox}>
+                        <Text style={styles.notesLabel}>Comentários do Aluno:</Text>
+                        <Text style={styles.notesText}>{item.notes}</Text>
+                      </View>
+                    ) : null}
+
+                    {/* Fotos de Evolução (Frente, Costas, Lateral) */}
+                    {hasPhotos ? (
+                      <View style={styles.checkInPhotosSection}>
+                        <Text style={styles.notesLabel}>Fotografias de Evolução:</Text>
+                        <View style={styles.checkInPhotosRow}>
+                          {item.frontPhotoUrl ? (
+                            <View style={styles.checkInPhotoWrap}>
+                              <Image source={{ uri: item.frontPhotoUrl }} style={styles.checkInPhoto} />
+                              <Text style={styles.photoTag}>Frente</Text>
+                            </View>
+                          ) : null}
+                          {item.backPhotoUrl ? (
+                            <View style={styles.checkInPhotoWrap}>
+                              <Image source={{ uri: item.backPhotoUrl }} style={styles.checkInPhoto} />
+                              <Text style={styles.photoTag}>Costas</Text>
+                            </View>
+                          ) : null}
+                          {item.sidePhotoUrl ? (
+                            <View style={styles.checkInPhotoWrap}>
+                              <Image source={{ uri: item.sidePhotoUrl }} style={styles.checkInPhoto} />
+                              <Text style={styles.photoTag}>Lateral</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      </View>
+                    ) : null}
+
+                    {/* Secção de Feedback do Treinador */}
+                    <View style={styles.feedbackSection}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <Text style={styles.feedbackSectionTitle}>{t('checkin.feedbackTitle')}</Text>
+                        {item.reviewedAt ? (
+                          <Text style={{ color: colors.muted, fontSize: 11 }}>
+                            Enviado em {new Date(item.reviewedAt).toLocaleDateString(currentLocale)}
+                          </Text>
+                        ) : null}
+                      </View>
+
+                      <TextInput
+                        style={[styles.feedbackInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
+                        placeholder={t('checkin.feedbackPlaceholder')}
+                        placeholderTextColor={colors.muted}
+                        multiline
+                        numberOfLines={3}
+                        value={draft}
+                        onChangeText={(txt) => setFeedbackDrafts((prev) => ({ ...prev, [item.id]: txt }))}
+                      />
+
+                      <TouchableOpacity
+                        onPress={() => handleSendFeedback(item.id)}
+                        disabled={isSending}
+                        style={[styles.sendFeedbackBtn, { backgroundColor: colors.accent }]}
+                      >
+                        {isSending ? (
+                          <ActivityIndicator size="small" color={colors.bg} />
+                        ) : (
+                          <>
+                            <Ionicons name="chatbubble-ellipses-outline" size={16} color={colors.bg} style={{ marginRight: 6 }} />
+                            <Text style={styles.sendFeedbackBtnText}>
+                              {item.coachFeedback ? t('checkin.sendFeedbackBtn') : t('checkin.sendFeedbackBtn')}
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </Card>
+                );
+              }}
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <Ionicons name="clipboard-outline" size={42} color={colors.muted} />
+                  <Text style={styles.emptyTitle}>{t('checkin.emptyTitle')}</Text>
+                  <Text style={styles.emptyText}>
+                    {t('checkin.emptyText')}
+                  </Text>
+                  <TouchableOpacity style={styles.emptyBtn} onPress={handleSendPushReminder}>
+                    <Text style={styles.emptyBtnText}>{t('checkin.sendPushBtn')}</Text>
+                  </TouchableOpacity>
+                </View>
+              }
+            />
+          </View>
+        )}
+
+        {/* SEPARADOR 6: GRÁFICOS VISUAIS DE EVOLUÇÃO (CHARTS) */}
+        {activeTab === 'charts' && (
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 40 }}>
+            {/* 1. Gráfico de Evolução do Peso Corporal */}
+            <View style={{ marginBottom: 20 }}>
+              <Text style={styles.tabSectionTitle}>{t('analytics.weightEvolution')}</Text>
+              <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 10 }}>
+                {t('analytics.coachChartsSubtitle')}
+              </Text>
+              <LineChart
+                title={t('analytics.weightEvolution')}
+                unit="kg"
+                data={
+                  analytics?.weightHistory?.map((w) => ({
+                    date: w.date,
+                    value: w.weight,
+                  })) || []
+                }
+                color={colors.accent}
+                height={210}
+                emptyText={t('analytics.weightEmptyPrompt')}
+              />
+            </View>
+
+            {/* 2. Gráfico de Progressão de Carga & 1RM Estimado */}
+            <View style={{ marginBottom: 20 }}>
+              <Text style={styles.tabSectionTitle}>{t('analytics.strengthEvolution')}</Text>
+              <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 10 }}>
+                {t('analytics.coachChartsSubtitle')}
+              </Text>
+
+              {/* Seletor de Exercícios */}
+              {analytics?.strengthHistory && analytics.strengthHistory.length > 0 ? (
+                <>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      {analytics.strengthHistory.map((ex) => {
+                        const isSelected = selectedExerciseName === ex.exerciseName;
+                        return (
+                          <TouchableOpacity
+                            key={ex.exerciseName}
+                            onPress={() => setSelectedExerciseName(ex.exerciseName)}
+                            style={[
+                              styles.exerciseChip,
+                              {
+                                backgroundColor: isSelected ? colors.accent : colors.surface,
+                                borderColor: isSelected ? colors.accent : colors.border,
+                              },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.exerciseChipText,
+                                { color: isSelected ? colors.bg : colors.text, fontWeight: isSelected ? '700' : '500' },
+                              ]}
+                            >
+                              {ex.exerciseName} ({ex.dataPointsCount})
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </ScrollView>
+
+                  {/* Componente Gráfico 1RM do Exercício Selecionado */}
+                  {(() => {
+                    const currentEx =
+                      analytics.strengthHistory.find((e) => e.exerciseName === selectedExerciseName) ||
+                      analytics.strengthHistory[0];
+
+                    const chartPoints =
+                      currentEx?.sessions.map((s: any) => ({
+                        date: s.date,
+                        value: s.estimated1RM,
+                        extra: `${s.maxWeight}kg x ${s.reps}`,
+                      })) || [];
+
+                    return (
+                      <LineChart
+                        title={`${t('analytics.estimated1RM')}: ${currentEx?.exerciseName || ''}`}
+                        unit="kg"
+                        data={chartPoints}
+                        color="#10B981"
+                        height={210}
+                        emptyText={t('analytics.noSessionsCompleted')}
+                      />
+                    );
+                  })()}
+                </>
+              ) : (
+                <Card style={{ padding: 24, alignItems: 'center', borderColor: colors.border }}>
+                  <Ionicons name="barbell-outline" size={36} color={colors.muted} />
+                  <Text style={{ color: colors.text, fontWeight: '700', marginTop: 8 }}>
+                    Sem treinos com cargas registados
+                  </Text>
+                  <Text style={{ color: colors.muted, textAlign: 'center', fontSize: 13, marginTop: 4 }}>
+                    Assim que o aluno completar treinos e registar séries com peso e repetições, os gráficos de 1RM serão gerados aqui automaticamente.
+                  </Text>
+                </Card>
+              )}
+            </View>
+          </ScrollView>
         )}
 
         {/* MODAL 1: SELECIONAR MODELO DE TREINO */}
@@ -1044,6 +1522,13 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
             </View>
           </KeyboardAvoidingView>
         </Modal>
+
+        <PhotoCompareModal
+          visible={isPhotoCompareVisible}
+          onClose={() => setIsPhotoCompareVisible(false)}
+          clientId={clientId}
+          clientName={client?.name || 'Aluno'}
+        />
       </View>
     </Screen>
   );
@@ -1618,6 +2103,12 @@ const getStyles = (colors: ColorScheme) => StyleSheet.create({
     paddingVertical: 40,
     gap: 12,
   },
+  emptyTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
   emptyText: {
     color: colors.muted,
     fontSize: 14,
@@ -1638,4 +2129,146 @@ const getStyles = (colors: ColorScheme) => StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  tabsScrollContent: {
+    paddingRight: 20,
+    gap: 8,
+  },
+  checkInAdminCard: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 14,
+  },
+  checkInTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  checkInAdminWeight: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  checkInDateBadge: {
+    backgroundColor: colors.surface2,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  checkInDateText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  miniMetricBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  miniMetricText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  painAlertBox: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    padding: 10,
+    marginBottom: 10,
+  },
+  painAlertTitle: {
+    color: '#EF4444',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  painAlertDesc: {
+    color: colors.text,
+    fontSize: 12,
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  checkInNotesBox: {
+    backgroundColor: colors.surface,
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  checkInPhotosSection: {
+    marginTop: 6,
+    marginBottom: 12,
+  },
+  checkInPhotosRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 6,
+  },
+  checkInPhotoWrap: {
+    flex: 1,
+    aspectRatio: 3 / 4,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
+    position: 'relative',
+  },
+  checkInPhoto: {
+    width: '100%',
+    height: '100%',
+  },
+  photoTag: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  feedbackSection: {
+    marginTop: 6,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  feedbackSectionTitle: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  feedbackInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 13,
+    minHeight: 60,
+    textAlignVertical: 'top',
+    marginBottom: 8,
+  },
+  sendFeedbackBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    paddingVertical: 10,
+  },
+  sendFeedbackBtnText: {
+    color: colors.bg,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  exerciseChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radius.full,
+    borderWidth: 1,
+  },
+  exerciseChipText: {
+    fontSize: 12,
+  },
 });
+

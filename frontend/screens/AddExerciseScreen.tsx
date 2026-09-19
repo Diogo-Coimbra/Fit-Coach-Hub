@@ -39,6 +39,7 @@ export default function AddExerciseScreen({ route, navigation }: any) {
   const [weight, setWeight] = useState('');
   const [restSeconds, setRestSeconds] = useState('90');
   const [notes, setNotes] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
   const [selectedExerciseMeta, setSelectedExerciseMeta] = useState<LibraryExercise | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -50,19 +51,19 @@ export default function AddExerciseScreen({ route, navigation }: any) {
       const matchesQuery =
         !searchQuery.trim() ||
         ex.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        ex.equipmentLabel.toLowerCase().includes(searchQuery.toLowerCase());
+        ex.instructions.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCategory && matchesQuery;
     });
   }, [selectedCategory, searchQuery]);
 
   const handleSelectFromLibrary = (exercise: LibraryExercise) => {
-    setName(exercise.name);
-    setSets(String(exercise.defaultSets));
-    setReps(String(exercise.defaultReps));
-    setRestSeconds(String(exercise.defaultRestSeconds));
-    setNotes(exercise.instructions);
     setSelectedExerciseMeta(exercise);
-    setIsLibraryExpanded(false); // Recolhe a biblioteca para focar nos detalhes
+    setName(exercise.name);
+    setSets(exercise.defaultSets.toString());
+    setReps(exercise.defaultReps.toString());
+    setRestSeconds(exercise.defaultRestSeconds.toString());
+    setNotes(exercise.instructions);
+    setIsLibraryExpanded(false);
   };
 
   const handleClearSelection = () => {
@@ -70,8 +71,8 @@ export default function AddExerciseScreen({ route, navigation }: any) {
   };
 
   const handleAddExercise = async () => {
-    if (!name.trim()) {
-      Alert.alert(t('common.attention'), t('workouts.nameRequiredAlert'));
+    if (!name.trim() || !sets.trim() || !reps.trim()) {
+      Alert.alert(t('workouts.requiredFieldsTitle'), t('workouts.requiredFieldsAlert'));
       return;
     }
 
@@ -85,6 +86,7 @@ export default function AddExerciseScreen({ route, navigation }: any) {
         weight: weight ? parseFloat(weight.replace(',', '.')) : null,
         restSeconds: parseInt(restSeconds) || 90,
         notes: notes.trim() || undefined,
+        videoUrl: videoUrl.trim() || undefined,
         workoutId,
       });
 
@@ -281,6 +283,14 @@ export default function AddExerciseScreen({ route, navigation }: any) {
               />
             </View>
           </View>
+
+          <Field
+            label="Link de Vídeo / GIF Demonstrativo"
+            placeholder="https://youtube.com/... ou link direto .mp4 / .gif"
+            value={videoUrl}
+            onChangeText={setVideoUrl}
+            autoCapitalize="none"
+          />
 
           <Field
             label={t('workouts.executionNotes')}

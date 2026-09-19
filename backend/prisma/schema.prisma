@@ -36,16 +36,33 @@ model User {
   stripeSubscriptionId String?
   subscriptionStatus   String?      @default("trialing")
 
+  // Notificações Push (Expo)
+  pushToken            String?
+
+  // Recuperação de Password
+  resetToken           String?
+  resetTokenExpiry     DateTime?
+
+  // Marca do Treinador (para Relatórios PDF e Apresentação)
+  coachBrandName       String?
+  coachLogoUrl         String?
+  coachPhone           String?
+  coachBio             String?
+
   createdAt     DateTime     @default(now())
 
   workouts         Workout[]
   assignedWorkouts Workout[]     @relation("AssignedWorkouts")
   logs             WorkoutLog[]
   bodyMetrics      BodyMetric[]
+  weeklyCheckIns   WeeklyCheckIn[]
   meals            MealLog[]
   clients          CoachClient[] @relation("CoachClients")
   coaches          CoachClient[] @relation("ClientCoaches")
   sentInvites      CoachInvite[] @relation("CoachInvites")
+  sentMessages     ChatMessage[] @relation("SentMessages")
+  coachMessages    ChatMessage[] @relation("CoachMessages")
+  clientMessages   ChatMessage[] @relation("ClientMessages")
 }
 
 model CoachClient {
@@ -78,6 +95,8 @@ model Workout {
   assignedBy   User?     @relation("AssignedWorkouts", fields: [assignedById], references: [id], onDelete: SetNull)
   isTemplate   Boolean   @default(false)
   category     String?   // Categoria (ex: Força, Hipertrofia, Mobilidade, Iniciante)
+  routineTag   String?   // "A", "B", "C", "D" (Divisão Semanal)
+  programName  String?   // "Mesociclo 1 - Hipertrofia", "Fase de Força"
   
   // Relação: Um treino tem uma lista de exercícios
   exercises   Exercise[] 
@@ -97,6 +116,8 @@ model Exercise {
   weight      Float?   // Peso em kg (opcional)
   restSeconds Int?     @default(90) // Descanso sugerido em segundos
   notes       String?  // Instruções de postura/execução do PT
+  videoUrl    String?  // Link de vídeo/GIF de demonstração da técnica
+  audioUrl    String?  // Nota de áudio do PT com instruções de execução
   
   // Relação: A que treino pertence este exercício?
   workoutId   String   
@@ -115,6 +136,9 @@ model WorkoutLog {
   durationMinutes Int      @default(0)
   notes           String?  // Feedback pós-treino do aluno ao PT
   rating          Int?     // Nível de esforço/satisfação de 1 a 5
+  rpe             Float?   // RPE da sessão de 1 a 10
+  painJoints      String?  // Articulações com dor (ex: "Joelho, Lombar")
+  painLevel       Int?     // 0 a 10
 
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   workout         Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
@@ -185,4 +209,52 @@ model CoachInvite {
 
   @@index([coachId])
   @@index([code])
+}
+
+model WeeklyCheckIn {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  weight        Float     // Peso em jejum (kg)
+  energyLevel   Int       @default(7) // 1 a 10
+  dietAdherence Int       @default(8) // 1 a 10
+  sleepQuality  Int?      @default(7) // 1 a 10
+  painLevel     Int?      @default(0) // 0 a 10 (0 = sem dor)
+  painNotes     String?   // Detalhes de dores articulares ou musculares
+  notes         String?   // Observações gerais da semana do aluno
+
+  frontPhotoUrl String?   // Foto frontal
+  backPhotoUrl  String?   // Foto costas
+  sidePhotoUrl  String?   // Foto lateral/perfil
+
+  coachFeedback String?   // Feedback e orientações do treinador
+  reviewedAt    DateTime? // Data de revisão pelo treinador
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  coachId   String
+  clientId  String
+  senderId  String
+  text      String?
+  mediaUrl  String?  // Foto, Vídeo, Áudio ou Ficheiro
+  mediaType String?  @default("TEXT") // 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE'
+  fileName  String?  // Nome original do ficheiro se aplicável
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  coach     User     @relation("CoachMessages", fields: [coachId], references: [id], onDelete: Cascade)
+  client    User     @relation("ClientMessages", fields: [clientId], references: [id], onDelete: Cascade)
+  sender    User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([coachId, clientId, createdAt])
+  @@index([clientId])
+  @@index([coachId])
 }

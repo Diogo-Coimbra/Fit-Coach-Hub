@@ -388,6 +388,59 @@ export interface Translations {
     generateBtn: string;
     shareMessage: string;
   };
+  analytics: {
+    chartsTitle: string;
+    chartsSubtitle: string;
+    coachChartsSubtitle: string;
+    weightEvolution: string;
+    weightEmptyPrompt: string;
+    strengthEvolution: string;
+    strengthEmptyPrompt: string;
+    estimated1RM: string;
+    noSessionsCompleted: string;
+    noChartData: string;
+  };
+  checkin: {
+    title: string;
+    bannerSubtitle: string;
+    tabTitle: string;
+    emptyTitle: string;
+    emptyText: string;
+    sendPushBtn: string;
+    prescribedByCoach: string;
+    painAlert: string;
+    feedbackTitle: string;
+    feedbackPlaceholder: string;
+    sendFeedbackBtn: string;
+    feedbackSentSuccess: string;
+  };
+  exerciseGuide: {
+    title: string;
+    targetMuscles: string;
+    setupTitle: string;
+    executionTitle: string;
+    mistakesTitle: string;
+    videoDemoTitle: string;
+    watchOnYoutube: string;
+    editVideoUrl: string;
+    saveVideoUrl: string;
+    videoUrlPlaceholder: string;
+    videoUrlSaved: string;
+  };
+  substituteExercise: {
+    modalTitle: string;
+    modalSubtitle: string;
+    searchPlaceholder: string;
+    recommendedEquivalents: string;
+    allEquivalents: string;
+    confirmSwapTitle: string;
+    confirmSwapMessage: string;
+    swapSuccess: string;
+    sameGroupTag: string;
+    dumbbellAltTag: string;
+    cableAltTag: string;
+    machineAltTag: string;
+  };
 }
 
 export const translations: Record<Language, Translations> = {
@@ -627,7 +680,7 @@ export const translations: Record<Language, Translations> = {
       trialExpiredDesc: 'O teu período de avaliação de 14 dias terminou. Ativa a tua subscrição para desbloquear o acesso total a todos os teus alunos.',
       activeDesc: 'Eleva a tua gestão de atletas com todas as ferramentas de treino e retenção.',
       trialingDesc: 'Aproveita o teu teste de 14 dias sem compromisso antes de iniciar a mensalidade.',
-      pricePerMonth: '29,90 € / mês',
+      pricePerMonth: '19,99 € / mês',
       cancelAnytime: 'Sem fidelização  ·  Cancela quando quiseres',
       activateStripe: 'Ativar Subscrição com Stripe',
       activateDemo: 'Ativar Modo de Demonstração (Simular Pagamento)',
@@ -671,7 +724,7 @@ export const translations: Record<Language, Translations> = {
       subExpiredDesc: 'O teu período de teste terminou. As funcionalidades de treinador estão suspensas.',
       subTrialDesc: 'Aproveita o teu teste de 14 dias sem compromisso antes de iniciar a mensalidade.',
       manageBillingStripe: 'Gerir Faturação no Stripe',
-      subscribePlanPrice: 'Subscrever Plano (29,90 €/mês)',
+      subscribePlanPrice: 'Subscrever Plano (19,99 €/mês)',
       devToolsTitle: 'Ferramentas de Simulação (Testes):',
       simulateActivation: 'Simular Ativação',
       simulateExpiry: 'Simular Expiração',
@@ -778,6 +831,59 @@ export const translations: Record<Language, Translations> = {
       shareBtn: 'Partilhar Código',
       generateBtn: 'Gerar Código de Convite',
       shareMessage: 'Acesso aos planos de treino e acompanhamento na app Fit Coach Hub.\n\nCódigo de ativação: {code}\nInsira este código na aplicação para iniciar o acompanhamento.',
+    },
+    analytics: {
+      chartsTitle: 'Gráficos de Evolução',
+      chartsSubtitle: 'Visualiza o teu progresso de peso e força ao longo do tempo.',
+      coachChartsSubtitle: 'Visualiza a progressão do peso e o 1RM estimado das principais cargas do teu aluno.',
+      weightEvolution: 'Evolução do Peso Corporal',
+      weightEmptyPrompt: 'Regista o teu peso ou faz check-in semanal para desenhar o gráfico.',
+      strengthEvolution: 'Carga Máxima & 1RM',
+      strengthEmptyPrompt: 'Sem sessões concluídas com carga para este exercício.',
+      estimated1RM: '1RM Estimado',
+      noSessionsCompleted: 'Sem sessões concluídas para este exercício.',
+      noChartData: 'Sem dados suficientes para apresentar o gráfico.',
+    },
+    checkin: {
+      title: 'Check-in Semanal',
+      bannerSubtitle: 'Regista o teu peso em jejum, fotos e notas para o teu treinador',
+      tabTitle: 'Check-ins',
+      emptyTitle: 'Sem check-ins submetidos',
+      emptyText: 'O teu aluno ainda não submeteu nenhum check-in semanal. Envia-lhe uma notificação para o incentivar!',
+      sendPushBtn: 'Enviar Notificação 🔔',
+      prescribedByCoach: 'Prescrito pelo teu Treinador',
+      painAlert: 'Alerta de Dor / Lesão Assinalada',
+      feedbackTitle: 'Feedback Semanal do Treinador',
+      feedbackPlaceholder: 'Escreve aqui o feedback da semana para o teu aluno...',
+      sendFeedbackBtn: 'Enviar Feedback ao Aluno 🚀',
+      feedbackSentSuccess: 'Feedback enviado com sucesso!',
+    },
+    exerciseGuide: {
+      title: 'Guia de Execução & Postura',
+      targetMuscles: 'Músculos Alvo',
+      setupTitle: 'Posicionamento Inicial',
+      executionTitle: 'Execução & Respiração',
+      mistakesTitle: 'Erros Comuns a Evitar',
+      videoDemoTitle: 'Demonstração em Vídeo',
+      watchOnYoutube: 'Ver Execução no YouTube 🎥',
+      editVideoUrl: 'Personalizar Vídeo/GIF do Exercício',
+      saveVideoUrl: 'Guardar Link de Vídeo',
+      videoUrlPlaceholder: 'URL do vídeo (ex: YouTube, Vimeo, MP4, GIF)...',
+      videoUrlSaved: 'Link de vídeo guardado com sucesso!',
+    },
+    substituteExercise: {
+      modalTitle: 'Substituir Exercício',
+      modalSubtitle: 'A máquina está ocupada? Escolhe um exercício equivalente sem perder o estímulo:',
+      searchPlaceholder: 'Pesquisar exercício alternativo...',
+      recommendedEquivalents: 'Equivalentes Recomendados (Mesmo Grupo Muscular)',
+      allEquivalents: 'Todos os Exercícios Alternativos',
+      confirmSwapTitle: 'Substituir Exercício',
+      confirmSwapMessage: 'Desejas substituir "{oldName}" por "{newName}" neste treino?',
+      swapSuccess: 'Exercício substituído com sucesso!',
+      sameGroupTag: 'Equivalente',
+      dumbbellAltTag: 'Com Halteres',
+      cableAltTag: 'Em Cabos',
+      machineAltTag: 'Em Máquina',
     },
   },
 
@@ -1017,7 +1123,7 @@ export const translations: Record<Language, Translations> = {
       trialExpiredDesc: 'Your 14-day trial period has ended. Activate your subscription to unlock full access to all your students.',
       activeDesc: 'Elevate your athlete management with all workout and retention tools.',
       trialingDesc: 'Enjoy your 14-day risk-free trial before starting your subscription.',
-      pricePerMonth: '29.90 € / month',
+      pricePerMonth: '19.99 € / month',
       cancelAnytime: 'No commitment  ·  Cancel anytime',
       activateStripe: 'Activate Subscription with Stripe',
       activateDemo: 'Activate Demo Mode (Simulate Payment)',
@@ -1061,7 +1167,7 @@ export const translations: Record<Language, Translations> = {
       subExpiredDesc: 'Your trial period has ended. Coach features are currently suspended.',
       subTrialDesc: 'Enjoy your 14-day trial with no commitment before starting your monthly plan.',
       manageBillingStripe: 'Manage Billing on Stripe',
-      subscribePlanPrice: 'Subscribe Plan (€29.90/month)',
+      subscribePlanPrice: 'Subscribe Plan (€19.99/month)',
       devToolsTitle: 'Developer Simulation Tools:',
       simulateActivation: 'Simulate Activation',
       simulateExpiry: 'Simulate Expiry',
@@ -1168,6 +1274,59 @@ export const translations: Record<Language, Translations> = {
       shareBtn: 'Share Code',
       generateBtn: 'Generate Invite Code',
       shareMessage: 'Access workout plans and coaching on the Fit Coach Hub app.\n\nActivation code: {code}\nEnter this code in the app to start coaching.',
+    },
+    analytics: {
+      chartsTitle: 'Evolution Charts',
+      chartsSubtitle: 'Track your body weight and strength progression over time.',
+      coachChartsSubtitle: "Track your student's weight progression and estimated 1RM for main lifts.",
+      weightEvolution: 'Body Weight Evolution',
+      weightEmptyPrompt: 'Log your weight or submit a weekly check-in to plot the chart.',
+      strengthEvolution: 'Max Load & 1RM',
+      strengthEmptyPrompt: 'No completed weighted sessions for this exercise.',
+      estimated1RM: 'Estimated 1RM',
+      noSessionsCompleted: 'No completed sessions for this exercise.',
+      noChartData: 'Not enough data to display chart.',
+    },
+    checkin: {
+      title: 'Weekly Check-in',
+      bannerSubtitle: 'Log your fasting weight, photos, and notes for your coach',
+      tabTitle: 'Check-ins',
+      emptyTitle: 'No check-ins submitted',
+      emptyText: "Your student hasn't submitted any weekly check-in yet. Send them a notification to encourage them!",
+      sendPushBtn: 'Send Notification 🔔',
+      prescribedByCoach: 'Prescribed by your Coach',
+      painAlert: 'Pain / Injury Reported Alert',
+      feedbackTitle: 'Coach Weekly Feedback',
+      feedbackPlaceholder: 'Write weekly feedback for your student here...',
+      sendFeedbackBtn: 'Send Feedback to Student 🚀',
+      feedbackSentSuccess: 'Feedback sent successfully!',
+    },
+    exerciseGuide: {
+      title: 'Execution & Posture Guide',
+      targetMuscles: 'Target Muscles',
+      setupTitle: 'Initial Setup',
+      executionTitle: 'Execution & Breathing',
+      mistakesTitle: 'Common Mistakes to Avoid',
+      videoDemoTitle: 'Video Demonstration',
+      watchOnYoutube: 'Watch on YouTube 🎥',
+      editVideoUrl: 'Customize Exercise Video/GIF',
+      saveVideoUrl: 'Save Video Link',
+      videoUrlPlaceholder: 'Video URL (e.g. YouTube, Vimeo, MP4, GIF)...',
+      videoUrlSaved: 'Video link saved successfully!',
+    },
+    substituteExercise: {
+      modalTitle: 'Substitute Exercise',
+      modalSubtitle: 'Is the machine taken? Pick an equivalent alternative without losing your training stimulus:',
+      searchPlaceholder: 'Search alternative exercise...',
+      recommendedEquivalents: 'Recommended Equivalents (Same Muscle Group)',
+      allEquivalents: 'All Alternative Exercises',
+      confirmSwapTitle: 'Substitute Exercise',
+      confirmSwapMessage: 'Do you want to substitute "{oldName}" with "{newName}" in this workout?',
+      swapSuccess: 'Exercise substituted successfully!',
+      sameGroupTag: 'Equivalent',
+      dumbbellAltTag: 'Dumbbells',
+      cableAltTag: 'Cables',
+      machineAltTag: 'Machine',
     },
   },
 
@@ -1407,7 +1566,7 @@ export const translations: Record<Language, Translations> = {
       trialExpiredDesc: 'Tu prueba de 14 días ha terminado. Activa tu suscripción para desbloquear el acceso total a todos tus alumnos.',
       activeDesc: 'Eleva tu gestión de atletas con todas las herramientas de entrenamiento y retención.',
       trialingDesc: 'Disfruta de tus 14 días de prueba sin compromiso antes de activar la cuota mensual.',
-      pricePerMonth: '29,90 € / mes',
+      pricePerMonth: '19,99 € / mes',
       cancelAnytime: 'Sin permanencia  ·  Cancela cuando quieras',
       activateStripe: 'Activar Suscripción con Stripe',
       activateDemo: 'Activar Modo Demo (Simular Pago)',
@@ -1451,7 +1610,7 @@ export const translations: Record<Language, Translations> = {
       subExpiredDesc: 'Tu período de prueba ha terminado. Las funciones de entrenador están suspendidas.',
       subTrialDesc: 'Disfruta de tu prueba de 14 días sin compromiso antes de iniciar la mensualidad.',
       manageBillingStripe: 'Gestionar Facturación en Stripe',
-      subscribePlanPrice: 'Suscribir Plan (29,90 €/mes)',
+      subscribePlanPrice: 'Suscribir Plan (19,99 €/mes)',
       devToolsTitle: 'Herramientas de Simulación (Pruebas):',
       simulateActivation: 'Simular Activación',
       simulateExpiry: 'Simular Expiración',
@@ -1558,6 +1717,59 @@ export const translations: Record<Language, Translations> = {
       shareBtn: 'Compartir Código',
       generateBtn: 'Generar Código de Invitación',
       shareMessage: 'Acceso a planes de entrenamiento en la app Fit Coach Hub.\n\nCódigo de activación: {code}\nIntroduce este código en la aplicación para iniciar.',
+    },
+    analytics: {
+      chartsTitle: 'Gráficos de Evolución',
+      chartsSubtitle: 'Monitorea el progreso de tu peso y fuerza a lo largo del tiempo.',
+      coachChartsSubtitle: 'Visualiza la progresión del peso y el 1RM estimado de tu alumno.',
+      weightEvolution: 'Evolución del Peso Corporal',
+      weightEmptyPrompt: 'Registra tu peso o haz un check-in semanal para generar el gráfico.',
+      strengthEvolution: 'Carga Máxima y 1RM',
+      strengthEmptyPrompt: 'Sin sesiones completadas con peso para este ejercicio.',
+      estimated1RM: '1RM Estimado',
+      noSessionsCompleted: 'Sin sesiones completadas para este ejercicio.',
+      noChartData: 'Sin datos suficientes para mostrar el gráfico.',
+    },
+    checkin: {
+      title: 'Check-in Semanal',
+      bannerSubtitle: 'Registra tu peso en ayunas, fotos y notas para tu entrenador',
+      tabTitle: 'Check-ins',
+      emptyTitle: 'Sin check-ins enviados',
+      emptyText: 'Tu alumno aún no ha enviado ningún check-in semanal. ¡Envíale una notificación para animarlo!',
+      sendPushBtn: 'Enviar Notificación 🔔',
+      prescribedByCoach: 'Prescrito por tu Entrenador',
+      painAlert: 'Alerta de Dolor / Lesión Notificada',
+      feedbackTitle: 'Feedback Semanal del Entrenador',
+      feedbackPlaceholder: 'Escribe aquí el feedback de la semana para tu alumno...',
+      sendFeedbackBtn: 'Enviar Feedback al Aluno 🚀',
+      feedbackSentSuccess: '¡Feedback enviado con éxito!',
+    },
+    exerciseGuide: {
+      title: 'Guía de Ejecución y Postura',
+      targetMuscles: 'Músculos Objetivo',
+      setupTitle: 'Posición Inicial',
+      executionTitle: 'Ejecución y Respiración',
+      mistakesTitle: 'Errores Comunes a Evitar',
+      videoDemoTitle: 'Demostración en Vídeo',
+      watchOnYoutube: 'Ver Ejecución en YouTube 🎥',
+      editVideoUrl: 'Personalizar Vídeo/GIF del Ejercicio',
+      saveVideoUrl: 'Guardar Enlace de Vídeo',
+      videoUrlPlaceholder: 'URL del vídeo (ej: YouTube, Vimeo, MP4, GIF)...',
+      videoUrlSaved: '¡Enlace de vídeo guardado con éxito!',
+    },
+    substituteExercise: {
+      modalTitle: 'Sustituir Ejercicio',
+      modalSubtitle: '¿La máquina está ocupada? Elige un ejercicio equivalente sin perder el estímulo:',
+      searchPlaceholder: 'Buscar ejercicio alternativo...',
+      recommendedEquivalents: 'Equivalentes Recomendados (Mismo Grupo Muscular)',
+      allEquivalents: 'Todos los Ejercicios Alternativos',
+      confirmSwapTitle: 'Sustituir Ejercicio',
+      confirmSwapMessage: '¿Deseas sustituir "{oldName}" por "{newName}" en esta rutina?',
+      swapSuccess: '¡Ejercicio sustituido con éxito!',
+      sameGroupTag: 'Equivalente',
+      dumbbellAltTag: 'Con Mancuernas',
+      cableAltTag: 'En Poleas',
+      machineAltTag: 'En Máquina',
     },
   },
 
@@ -1797,7 +2009,7 @@ export const translations: Record<Language, Translations> = {
       trialExpiredDesc: 'Votre essai de 14 jours est terminé. Activez votre abonnement pour débloquer l\'accès complet à tous vos élèves.',
       activeDesc: 'Optimisez votre suivi d\'athlètes avec tous les outils d\'entraînement et de fidélisation.',
       trialingDesc: 'Profitez de vos 14 jours d\'essai sans engagement avant d\'activer votre abonnement.',
-      pricePerMonth: '29,90 € / mois',
+      pricePerMonth: '19,99 € / mois',
       cancelAnytime: 'Sans engagement  ·  Résiliable à tout moment',
       activateStripe: 'Activer l\'Abonnement avec Stripe',
       activateDemo: 'Mode Démonstration (Simuler le Paiement)',
@@ -1841,7 +2053,7 @@ export const translations: Record<Language, Translations> = {
       subExpiredDesc: 'Votre période d\'essai est terminée. Les fonctionnalités de coach sont suspendues.',
       subTrialDesc: 'Profitez de vos 14 jours d\'essai sans engagement avant d\'activer votre abonnement.',
       manageBillingStripe: 'Gérer la Facturation sur Stripe',
-      subscribePlanPrice: 'S\'abonner au Plan (29,90 €/mois)',
+      subscribePlanPrice: 'S\'abonner au Plan (19,99 €/mois)',
       devToolsTitle: 'Outils de Simulation (Développeur) :',
       simulateActivation: 'Simuler l\'Activation',
       simulateExpiry: 'Simuler l\'Expiration',
@@ -1948,6 +2160,59 @@ export const translations: Record<Language, Translations> = {
       shareBtn: 'Partager le Code',
       generateBtn: 'Générer un Code d\'Invitation',
       shareMessage: 'Accès aux plans d\'entraînement sur l\'application Fit Coach Hub.\n\nCode d\'activation : {code}\nEntrez ce code dans l\'application pour commencer.',
+    },
+    analytics: {
+      chartsTitle: 'Graphiques d\'Évolution',
+      chartsSubtitle: 'Suivez l\'évolution de votre poids et de votre force au fil du temps.',
+      coachChartsSubtitle: 'Visualisez la progression du poids et le 1RM estimé de votre élève.',
+      weightEvolution: 'Évolution du Poids Corporel',
+      weightEmptyPrompt: 'Enregistrez votre poids ou effectuez un check-in hebdomadaire pour afficher le graphique.',
+      strengthEvolution: 'Charge Maximale & 1RM',
+      strengthEmptyPrompt: 'Aucune séance avec charge complétée pour cet exercice.',
+      estimated1RM: '1RM Estimé',
+      noSessionsCompleted: 'Aucune séance complétée pour cet exercice.',
+      noChartData: 'Pas assez de données pour afficher le graphique.',
+    },
+    checkin: {
+      title: 'Check-in Hebdomadaire',
+      bannerSubtitle: 'Enregistrez votre poids à jeun, vos photos et vos notes pour votre coach',
+      tabTitle: 'Check-ins',
+      emptyTitle: 'Aucun check-in soumis',
+      emptyText: 'Votre élève n\'a pas encore soumis de check-in hebdomadaire. Envoyez-lui une notification pour l\'encourager !',
+      sendPushBtn: 'Envoyer une Notification 🔔',
+      prescribedByCoach: 'Prescrit par votre Coach',
+      painAlert: 'Alerte Douleur / Blessure Signalée',
+      feedbackTitle: 'Feedback Hebdomadaire du Coach',
+      feedbackPlaceholder: 'Écrivez ici le feedback de la semaine pour votre élève...',
+      sendFeedbackBtn: 'Envoyer le Feedback à l\'Élève 🚀',
+      feedbackSentSuccess: 'Feedback envoyé avec succès !',
+    },
+    exerciseGuide: {
+      title: 'Guide d\'Exécution & Posture',
+      targetMuscles: 'Muscles Ciblés',
+      setupTitle: 'Positionnement Initial',
+      executionTitle: 'Exécution & Respiration',
+      mistakesTitle: 'Erreurs Courantes à Éviter',
+      videoDemoTitle: 'Démonstration Vidéo',
+      watchOnYoutube: 'Voir l\'Exécution sur YouTube 🎥',
+      editVideoUrl: 'Personnaliser la Vidéo/GIF de l\'Exercice',
+      saveVideoUrl: 'Enregistrer le Lien Vidéo',
+      videoUrlPlaceholder: 'URL de la vidéo (ex: YouTube, Vimeo, MP4, GIF)...',
+      videoUrlSaved: 'Lien vidéo enregistré avec succès !',
+    },
+    substituteExercise: {
+      modalTitle: 'Remplacer l\'Exercice',
+      modalSubtitle: 'La machine est occupée ? Choisissez un équivalent sans perdre le stimulus :',
+      searchPlaceholder: 'Rechercher un exercice alternatif...',
+      recommendedEquivalents: 'Équivalents Recommandés (Même Groupe Musculaire)',
+      allEquivalents: 'Tous les Exercices Alternatifs',
+      confirmSwapTitle: 'Remplacer l\'Exercice',
+      confirmSwapMessage: 'Voulez-vous remplacer "{oldName}" par "{newName}" dans cette séance ?',
+      swapSuccess: 'Exercice remplacé avec succès !',
+      sameGroupTag: 'Équivalent',
+      dumbbellAltTag: 'Aux Haltères',
+      cableAltTag: 'À la Poulie',
+      machineAltTag: 'À la Machine',
     },
   },
 };

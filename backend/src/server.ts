@@ -1,22 +1,28 @@
-import 'dotenv/config'; 
+import dotenv from 'dotenv';
+import path from 'path';
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config();
 import express, { Response, NextFunction } from 'express';
 import cors from 'cors';
 import fs from 'fs';
-import path from 'path';
 import Stripe from 'stripe';
 import { OAuth2Client } from 'google-auth-library';
 import { PrismaClient, Role } from '@prisma/client';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import bcrypt from 'bcryptjs';
 import {
   authenticateToken,
   requireCoach,
   generateToken,
   AuthenticatedRequest,
 } from './auth';
-import { saveUploadedImage, uploadsDir } from './storage';
+import { saveUploadedImage, saveUploadedMedia, uploadsDir } from './storage';
 import { extractAndParseJson } from './aiUtils';
+import { notifyUser, notifyCoachesOfClient, sendExpoPushNotification } from './notifications';
+import { sendPasswordResetEmail } from './email';
+import { renderLegalPage, privacyPolicyHtml, termsOfServiceHtml } from './legalPages';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -40,6 +46,35 @@ app.use((req, res, next) => {
   next();
 });
 
+// Health check e monitorização de uptime (Render, Railway, Fly.io, etc.)
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
+});
+
+// Raiz do servidor - Informações da API
+app.get('/', (_req, res) => {
+  res.status(200).json({
+    name: 'Fit Coach Hub API',
+    version: '1.0.0',
+    status: 'online',
+    legal: {
+      privacy: '/privacy',
+      terms: '/terms',
+    },
+  });
+});
+
+// Páginas públicas exigidas pela Apple App Store e Google Play Console
+app.get('/privacy', (_req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(renderLegalPage('Política de Privacidade', privacyPolicyHtml));
+});
+
+app.get('/terms', (_req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(renderLegalPage('Termos de Serviço', termsOfServiceHtml));
+});
+
 const connectionString = `${process.env.DATABASE_URL}`;
 const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
@@ -51,6 +86,8 @@ const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SEC
 
 console.log("Base de dados conectada:", process.env.DATABASE_URL ? "Sim" : "Não");
 console.log("Stripe integrado:", stripe ? "Sim (Live/Test Key)" : "Não (Modo Simulação Dev)");
+const emailProvider = process.env.EMAIL_SERVICE === 'gmail' && process.env.GMAIL_USER ? `Gmail SMTP (${process.env.GMAIL_USER})` : (process.env.RESEND_API_KEY ? 'Resend' : 'Modo Simulação Dev');
+console.log("Serviço de Email:", emailProvider);
 
 // Helper para gerar código de convite seguro (ex: PT-7K2X)
 function generateInviteCode(): string {
@@ -144,15 +181,20 @@ async function canAccessWorkout(callerId: string, callerRole: Role, workoutId: s
 }
 
 // Helper para validar permissão sobre um exercício (Dono do treino ou o seu Treinador)
-async function canAccessExercise(callerId: string, callerRole: Role, exerciseId: string): Promise<{ allowed: boolean; workoutId?: string }> {
+async function canAccessExercise(
+  callerId: string,
+  callerRole: Role,
+  exerciseId: string
+): Promise<{ allowed: boolean; workoutId?: string; isAssignedByCoach?: boolean }> {
   const exercise = await prisma.exercise.findUnique({
     where: { id: exerciseId },
-    select: { workoutId: true, workout: { select: { userId: true } } },
+    select: { workoutId: true, workout: { select: { userId: true, assignedById: true } } },
   });
   if (!exercise) return { allowed: false };
-  if (exercise.workout.userId === callerId) return { allowed: true, workoutId: exercise.workoutId };
+  const isAssignedByCoach = !!exercise.workout.assignedById;
+  if (exercise.workout.userId === callerId) return { allowed: true, workoutId: exercise.workoutId, isAssignedByCoach };
   if (callerRole === 'COACH' && (await isCoachOfClient(callerId, exercise.workout.userId))) {
-    return { allowed: true, workoutId: exercise.workoutId };
+    return { allowed: true, workoutId: exercise.workoutId, isAssignedByCoach };
   }
   return { allowed: false };
 }
@@ -179,6 +221,250 @@ app.post('/api/uploads', authenticateToken, async (req: AuthenticatedRequest, re
 // ==========================================
 // ROTAS DE AUTENTICAÇÃO (AUTH & JWT)
 // ==========================================
+
+// Registo de Conta Local (Email & Password)
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { name, email, password, role } = req.body;
+
+    const cleanName = String(name || '').trim();
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const cleanPass = String(password || '');
+
+    if (!cleanName || cleanName.length < 2) {
+      return res.status(400).json({ error: 'Por favor, introduz um nome válido (mínimo 2 caracteres).' });
+    }
+
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      return res.status(400).json({ error: 'Por favor, introduz um endereço de email válido.' });
+    }
+
+    if (!cleanPass || cleanPass.length < 6) {
+      return res.status(400).json({ error: 'A palavra-passe deve ter pelo menos 6 caracteres.' });
+    }
+
+    const selectedRole: Role = role === 'COACH' ? 'COACH' : 'CLIENT';
+
+    const existingUser = await prisma.user.findUnique({
+      where: { email: cleanEmail },
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ error: 'Já existe uma conta associada a este email.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(cleanPass, 10);
+    const trialEndsAt = selectedRole === 'COACH' ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) : null;
+
+    const user = await prisma.user.create({
+      data: {
+        name: cleanName,
+        email: cleanEmail,
+        password: hashedPassword,
+        role: selectedRole,
+        trialEndsAt,
+        subscriptionStatus: selectedRole === 'COACH' ? 'trialing' : undefined,
+        weeklyGoal: 3,
+      },
+    });
+
+    const jwtToken = generateToken(user);
+    console.log(`✅ Nova conta registada: ${user.name} (${user.email}) - Perfil: ${user.role}`);
+
+    res.status(201).json({
+      message: 'Conta criada com sucesso!',
+      user,
+      token: jwtToken,
+      coach: null,
+      trial: getTrialInfo(user),
+    });
+  } catch (error) {
+    console.error('❌ Erro no registo:', error);
+    res.status(500).json({ error: 'Erro ao criar conta. Tenta novamente.' });
+  }
+});
+
+// Login de Conta Local (Email & Password)
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const cleanPass = String(password || '');
+
+    if (!cleanEmail || !cleanPass) {
+      return res.status(400).json({ error: 'Por favor, introduz o teu email e a tua palavra-passe.' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: cleanEmail },
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Email ou palavra-passe incorretos.' });
+    }
+
+    if (!user.password) {
+      return res.status(400).json({
+        error: 'Esta conta foi registada através da Google. Por favor, clica em "Continuar com Google" ou usa a opção "Esqueci-me da palavra-passe".',
+      });
+    }
+
+    const isMatch = await bcrypt.compare(cleanPass, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Email ou palavra-passe incorretos.' });
+    }
+
+    let coach = null;
+    if (user.role === 'CLIENT') {
+      const relation = await prisma.coachClient.findFirst({
+        where: { clientId: user.id },
+        include: {
+          coach: {
+            select: { id: true, name: true, email: true, picture: true, coachBrandName: true },
+          },
+        },
+      });
+      coach = relation?.coach || null;
+    }
+
+    const jwtToken = generateToken(user);
+    console.log(`✅ Login com password realizado: ${user.name} (${user.role})`);
+
+    res.status(200).json({
+      message: 'Sessão iniciada com sucesso!',
+      user,
+      token: jwtToken,
+      coach,
+      trial: getTrialInfo(user),
+    });
+  } catch (error) {
+    console.error('❌ Erro no login:', error);
+    res.status(500).json({ error: 'Erro ao iniciar sessão.' });
+  }
+});
+
+// Recuperação de Password - Pedido de Código
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    const cleanEmail = String(email || '').trim().toLowerCase();
+
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return res.status(400).json({ error: 'Por favor, introduz um email válido.' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: cleanEmail },
+    });
+
+    if (!user) {
+      return res.status(200).json({
+        message: 'Se este email estiver registado, enviámos um código de recuperação.',
+      });
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        resetToken: code,
+        resetTokenExpiry: expiry,
+      },
+    });
+
+    console.log(`\n======================================================`);
+    console.log(`🔑 [CÓDIGO DE RECUPERAÇÃO DE PASSWORD]`);
+    console.log(`👤 Para: ${cleanEmail}`);
+    console.log(`🔢 Código: ${code}`);
+    console.log(`⏳ Válido até: ${expiry.toLocaleTimeString()}`);
+    console.log(`======================================================\n`);
+
+    const emailResult = await sendPasswordResetEmail(cleanEmail, code, user.name);
+
+    res.status(200).json({
+      message: 'Código de recuperação enviado para o teu email!',
+      devCode: emailResult.mode === 'dev' ? code : undefined,
+      emailMode: emailResult.mode,
+    });
+  } catch (error) {
+    console.error('❌ Erro no forgot-password:', error);
+    res.status(500).json({ error: 'Erro ao processar pedido de recuperação.' });
+  }
+});
+
+// Recuperação de Password - Validação do Código e Redefinição
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const { email, code, newPassword } = req.body;
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const cleanCode = String(code || '').trim();
+    const cleanNewPass = String(newPassword || '');
+
+    if (!cleanEmail || !cleanCode || !cleanNewPass) {
+      return res.status(400).json({ error: 'Preenche todos os campos (email, código e nova palavra-passe).' });
+    }
+
+    if (cleanNewPass.length < 6) {
+      return res.status(400).json({ error: 'A nova palavra-passe deve ter pelo menos 6 caracteres.' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: cleanEmail },
+    });
+
+    if (!user || !user.resetToken || !user.resetTokenExpiry) {
+      return res.status(400).json({ error: 'Código de recuperação inválido ou expirado.' });
+    }
+
+    if (user.resetToken !== cleanCode) {
+      return res.status(400).json({ error: 'Código de recuperação incorreto.' });
+    }
+
+    if (new Date() > user.resetTokenExpiry) {
+      return res.status(400).json({ error: 'O código de recuperação expirou. Pede um novo código.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(cleanNewPass, 10);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        resetToken: null,
+        resetTokenExpiry: null,
+      },
+    });
+
+    console.log(`✅ Palavra-passe redefinida com sucesso para: ${user.email}`);
+
+    res.status(200).json({
+      message: 'Palavra-passe alterada com sucesso! Podes agora iniciar sessão.',
+    });
+  } catch (error) {
+    console.error('❌ Erro no reset-password:', error);
+    res.status(500).json({ error: 'Erro ao redefinir palavra-passe.' });
+  }
+});
+
+// Eliminar conta do utilizador e dados associados (DELETE) - Diretriz Apple 5.1.1(v)
+app.delete('/api/users/me', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    console.log(`⚠️ Pedido de eliminação de conta para utilizador ID: ${userId}`);
+
+    await prisma.user.delete({
+      where: { id: userId },
+    });
+
+    console.log(`🗑️ Conta eliminada com sucesso (ID: ${userId})`);
+    res.status(200).json({ success: true, message: 'Conta eliminada permanentemente com sucesso.' });
+  } catch (error) {
+    console.error('❌ Erro ao eliminar conta:', error);
+    res.status(500).json({ error: 'Erro ao eliminar a conta. Tenta novamente mais tarde.' });
+  }
+});
 
 // Autenticação Google com devolução de JWT { user, token }
 app.post('/api/auth/google', async (req, res) => {
@@ -727,7 +1013,7 @@ app.get('/api/coach/clients/:clientId', authenticateToken, requireActiveCoach, a
 app.post('/api/coach/assign-workout', authenticateToken, requireActiveCoach, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const coachId = req.user!.id;
-    const { clientId, workoutId, name, description, exercises } = req.body;
+    const { clientId, workoutId, name, description, exercises, routineTag, programName } = req.body;
 
     if (!clientId) {
       return res.status(400).json({ error: 'O ID do cliente é obrigatório.' });
@@ -760,6 +1046,8 @@ app.post('/api/coach/assign-workout', authenticateToken, requireActiveCoach, asy
         data: {
           name: source.name,
           description: source.description,
+          routineTag: routineTag || source.routineTag || null,
+          programName: programName || source.programName || null,
           userId: clientId, // Dono do treino passa a ser o cliente
           assignedById: coachId,
           exercises: {
@@ -782,6 +1070,8 @@ app.post('/api/coach/assign-workout', authenticateToken, requireActiveCoach, asy
         data: {
           name,
           description: description || null,
+          routineTag: routineTag || null,
+          programName: programName || null,
           userId: clientId,
           assignedById: coachId,
           exercises: exercises && exercises.length > 0 ? {
@@ -802,6 +1092,17 @@ app.post('/api/coach/assign-workout', authenticateToken, requireActiveCoach, asy
     }
 
     console.log(`Treino "${assignedWorkout.name}" atribuído ao cliente ${clientId} pelo PT ${coachId}`);
+
+    // Notificar o aluno que recebeu um novo treino do treinador
+    const coachUser = await prisma.user.findUnique({ where: { id: coachId }, select: { name: true } });
+    notifyUser(
+      prisma,
+      clientId,
+      '🏋️ Novo Treino Prescrito!',
+      `O teu treinador ${coachUser?.name || 'PT'} prescreveu-te o treino "${assignedWorkout.name}".`,
+      { type: 'WORKOUT_ASSIGNED', workoutId: assignedWorkout.id }
+    ).catch((err) => console.error('Falha push workout assign:', err));
+
     res.status(201).json(assignedWorkout);
   } catch (error) {
     console.error('Erro ao atribuir treino ao cliente:', error);
@@ -836,7 +1137,7 @@ app.post('/api/workouts', authenticateToken, async (req: AuthenticatedRequest, r
   try {
     const callerId = req.user!.id;
     const callerRole = req.user!.role;
-    const { name, description, targetClientId, isTemplate } = req.body;
+    const { name, description, targetClientId, isTemplate, routineTag, programName } = req.body;
 
     if (!name) {
       return res.status(400).json({ error: 'O nome do treino é obrigatório!' });
@@ -870,6 +1171,8 @@ app.post('/api/workouts', authenticateToken, async (req: AuthenticatedRequest, r
       data: {
         name,
         description,
+        routineTag: routineTag ? String(routineTag).trim().toUpperCase() : null,
+        programName: programName ? String(programName).trim() : null,
         userId: targetUserId,
         assignedById,
         isTemplate: callerRole === 'COACH' && !targetClientId ? !!isTemplate : false,
@@ -1063,6 +1366,10 @@ app.delete('/api/workouts/:workoutId', authenticateToken, async (req: Authentica
       }
     }
 
+    if (workout.assignedById && callerRole !== 'COACH') {
+      return res.status(403).json({ error: 'Não é permitido ao aluno apagar um treino prescrito pelo seu treinador.' });
+    }
+
     await prisma.exercise.deleteMany({ where: { workoutId } });
     await prisma.workout.delete({ where: { id: workoutId } });
 
@@ -1083,7 +1390,7 @@ app.post('/api/exercises', authenticateToken, async (req: AuthenticatedRequest, 
   try {
     const callerId = req.user!.id;
     const callerRole = req.user!.role;
-    const { name, sets, reps, weight, restSeconds, notes, workoutId } = req.body;
+    const { name, sets, reps, weight, restSeconds, notes, videoUrl, workoutId } = req.body;
 
     if (!name || !workoutId) {
       return res.status(400).json({ error: 'O nome do exercício e o ID do treino são obrigatórios.' });
@@ -1094,6 +1401,17 @@ app.post('/api/exercises', authenticateToken, async (req: AuthenticatedRequest, 
       return res.status(403).json({ error: 'Não tens permissão para adicionar exercícios a este treino.' });
     }
 
+    // Se o treino foi prescrito pelo treinador, o aluno não pode adicionar exercícios
+    const targetWorkout = await prisma.workout.findUnique({
+      where: { id: workoutId },
+      select: { assignedById: true },
+    });
+    if (targetWorkout?.assignedById && callerRole !== 'COACH') {
+      return res.status(403).json({
+        error: 'Não é permitido ao aluno adicionar exercícios a um plano prescrito pelo treinador.',
+      });
+    }
+
     const newExercise = await prisma.exercise.create({
       data: {
         name,
@@ -1102,6 +1420,7 @@ app.post('/api/exercises', authenticateToken, async (req: AuthenticatedRequest, 
         weight: weight !== undefined && weight !== null ? Number(weight) : null,
         restSeconds: restSeconds ? Number(restSeconds) : 90,
         notes: notes ? String(notes).trim() : null,
+        videoUrl: videoUrl ? String(videoUrl).trim() : null,
         workoutId,
       },
     });
@@ -1120,23 +1439,48 @@ app.put('/api/exercises/:exerciseId', authenticateToken, async (req: Authenticat
     const callerId = req.user!.id;
     const callerRole = req.user!.role;
     const exerciseId = toStr(req.params.exerciseId);
-    const { name, sets, reps, weight, restSeconds, notes } = req.body;
+    const { name, sets, reps, weight, restSeconds, notes, videoUrl } = req.body;
 
     const accessCheck = await canAccessExercise(callerId, callerRole, exerciseId);
     if (!accessCheck.allowed) {
       return res.status(403).json({ error: 'Não tens permissão para atualizar este exercício.' });
     }
 
+    // Se o treino foi prescrito pelo treinador e quem está a editar é o aluno (não é COACH):
+    // Só é permitida a troca/substituição do exercício (nome e opcionalmente videoUrl)!
+    // Não pode alterar sets, reps, weight base do plano, restSeconds, ou notes prescritas pelo PT.
+    if (accessCheck.isAssignedByCoach && callerRole !== 'COACH') {
+      const hasStructureEdit =
+        sets !== undefined ||
+        reps !== undefined ||
+        weight !== undefined ||
+        restSeconds !== undefined ||
+        notes !== undefined;
+
+      if (hasStructureEdit && name === undefined) {
+        return res.status(403).json({
+          error: 'Não é permitido ao aluno alterar os parâmetros prescritos pelo treinador. Apenas é permitida a substituição do exercício.',
+        });
+      }
+    }
+
+    const updateData: any = {};
+    if (accessCheck.isAssignedByCoach && callerRole !== 'COACH') {
+      if (name !== undefined) updateData.name = name;
+      if (videoUrl !== undefined) updateData.videoUrl = videoUrl ? String(videoUrl).trim() : null;
+    } else {
+      if (name !== undefined) updateData.name = name;
+      if (sets !== undefined) updateData.sets = Number(sets);
+      if (reps !== undefined) updateData.reps = Number(reps);
+      if (weight !== undefined) updateData.weight = weight !== null ? Number(weight) : null;
+      if (restSeconds !== undefined) updateData.restSeconds = Number(restSeconds);
+      if (notes !== undefined) updateData.notes = notes ? String(notes).trim() : null;
+      if (videoUrl !== undefined) updateData.videoUrl = videoUrl ? String(videoUrl).trim() : null;
+    }
+
     const updatedExercise = await prisma.exercise.update({
       where: { id: exerciseId },
-      data: {
-        ...(name !== undefined ? { name } : {}),
-        ...(sets !== undefined ? { sets: Number(sets) } : {}),
-        ...(reps !== undefined ? { reps: Number(reps) } : {}),
-        ...(weight !== undefined ? { weight: weight !== null ? Number(weight) : null } : {}),
-        ...(restSeconds !== undefined ? { restSeconds: Number(restSeconds) } : {}),
-        ...(notes !== undefined ? { notes: notes ? String(notes).trim() : null } : {}),
-      },
+      data: updateData,
     });
 
     console.log(`Exercício ${exerciseId} atualizado`);
@@ -1157,6 +1501,12 @@ app.delete('/api/exercises/:exerciseId', authenticateToken, async (req: Authenti
     const accessCheck = await canAccessExercise(callerId, callerRole, exerciseId);
     if (!accessCheck.allowed) {
       return res.status(403).json({ error: 'Não tens permissão para eliminar este exercício.' });
+    }
+
+    if (accessCheck.isAssignedByCoach && callerRole !== 'COACH') {
+      return res.status(403).json({
+        error: 'Não é permitido ao aluno eliminar exercícios de um plano prescrito pelo treinador.',
+      });
     }
 
     await prisma.exercise.delete({ where: { id: exerciseId } });
@@ -1295,11 +1645,14 @@ app.post('/api/exercises/previous-performance', authenticateToken, async (req: A
 app.post('/api/logs', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
-    const { workoutId, durationMinutes, notes, rating, sets } = req.body;
+    const { workoutId, durationMinutes, notes, rating, rpe, painJoints, painLevel, sets } = req.body;
 
     if (!workoutId) {
       return res.status(400).json({ error: 'O identificador do treino é obrigatório.' });
     }
+
+    const calculatedRpe = rpe ? Number(rpe) : (rating ? Number(rating) * 2 : null);
+    const parsedPainLevel = painLevel !== undefined && painLevel !== null ? Number(painLevel) : (painJoints && painJoints !== 'Nenhum' ? 5 : 0);
 
     const newLog = await prisma.workoutLog.create({
       data: {
@@ -1307,7 +1660,10 @@ app.post('/api/logs', authenticateToken, async (req: AuthenticatedRequest, res: 
         workoutId,
         durationMinutes: durationMinutes ? Number(durationMinutes) : 0,
         notes: notes ? String(notes).trim() : null,
-        rating: rating ? Number(rating) : null,
+        rating: rating ? Number(rating) : (calculatedRpe ? Math.round(calculatedRpe / 2) : null),
+        rpe: calculatedRpe,
+        painJoints: painJoints ? String(painJoints).trim() : null,
+        painLevel: parsedPainLevel,
         setLogs: Array.isArray(sets) && sets.length > 0 ? {
           create: sets.map((s: any, idx: number) => ({
             exerciseId: s.exerciseId || null,
@@ -1355,7 +1711,38 @@ app.post('/api/logs', authenticateToken, async (req: AuthenticatedRequest, res: 
       }
     }
 
-    console.log(`Treino ${workoutId} concluído por ${userId} (${durationMinutes} min)`);
+    console.log(`Treino ${workoutId} concluído por ${userId} (${durationMinutes} min, RPE ${calculatedRpe || '-'})`);
+
+    // Notificar treinadores da conclusão do treino
+    const studentUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    const studentName = studentUser?.name || 'Aluno';
+    const workoutName = newLog.workout?.name || 'Treino';
+    
+    // Verificar queixa de dor articular ou nota de desconforto
+    const hasReportedPain = (painJoints && painJoints !== 'Nenhum' && painJoints.length > 0) ||
+      (parsedPainLevel > 0) ||
+      (rating && rating <= 2) ||
+      (notes && /dor|dói|les[aã]o|ombro|joelho|coluna|articular|pain|hurt/i.test(notes));
+    
+    if (hasReportedPain) {
+      const painDesc = painJoints && painJoints !== 'Nenhum' ? `⚠️ Queixa de dor: ${painJoints} (Nível ${parsedPainLevel}/10). ` : '';
+      notifyCoachesOfClient(
+        prisma,
+        userId,
+        `⚠️ Alerta de Dor / Desconforto: ${studentName}`,
+        `${studentName} concluiu "${workoutName}" com alerta de desconforto. ${painDesc}Esforço: ${calculatedRpe || rating || '-'}/10. "${notes || 'Sem detalhes adicionais'}"`,
+        { type: 'WORKOUT_PAIN_ALERT', workoutLogId: newLog.id }
+      ).catch((err) => console.error('Falha push dor:', err));
+    } else {
+      notifyCoachesOfClient(
+        prisma,
+        userId,
+        `💪 Treino Concluído: ${studentName}`,
+        `${studentName} completou "${workoutName}" (${durationMinutes || 0} min, Esforço RPE ${calculatedRpe || 7}/10).`,
+        { type: 'WORKOUT_COMPLETED', workoutLogId: newLog.id }
+      ).catch((err) => console.error('Falha push workout complete:', err));
+    }
+
     res.status(201).json(newLog);
   } catch (error) {
     console.error('Erro ao registar sessão de treino:', error);
@@ -1520,6 +1907,652 @@ app.get('/api/metrics/assessment/:userId', authenticateToken, async (req: Authen
   } catch (error) {
     console.error('Erro ao obter avaliações físicas:', error);
     res.status(500).json({ error: 'Erro interno ao obter histórico de avaliações.' });
+  }
+});
+
+// ==========================================
+// ROTAS DE NOTIFICAÇÕES PUSH (EXPO) 📱
+// ==========================================
+
+// Registar ou atualizar Expo Push Token do utilizador
+app.post('/api/users/push-token', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { pushToken } = req.body;
+
+    if (!pushToken || typeof pushToken !== 'string') {
+      return res.status(400).json({ error: 'pushToken é obrigatório.' });
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { pushToken: pushToken.trim() },
+    });
+
+    console.log(`📱 Push token atualizado para o utilizador ${userId}`);
+    res.status(200).json({ success: true, message: 'Push token registado com sucesso.' });
+  } catch (error) {
+    console.error('Erro ao guardar push token:', error);
+    res.status(500).json({ error: 'Erro ao registar push token.' });
+  }
+});
+
+// Enviar lembrete / push de incentivo a aluno inativo
+app.post('/api/coach/notify-inactive', authenticateToken, requireActiveCoach, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const coachId = req.user!.id;
+    const { clientId, message } = req.body;
+
+    if (!clientId) {
+      return res.status(400).json({ error: 'clientId é obrigatório.' });
+    }
+
+    const isCoach = await isCoachOfClient(coachId, clientId);
+    if (!isCoach) {
+      return res.status(403).json({ error: 'Não tens autorização para contactar este aluno.' });
+    }
+
+    const coach = await prisma.user.findUnique({ where: { id: coachId }, select: { name: true } });
+    const customMsg = message || 'Sentimos a tua falta nos treinos! Vamos manter a consistência e treinar hoje? 💪';
+
+    const sent = await notifyUser(
+      prisma,
+      clientId,
+      `🏋️ Mensagem do Treinador ${coach?.name || 'PT'}`,
+      customMsg,
+      { type: 'INACTIVITY_REMINDER', coachId }
+    );
+
+    res.status(200).json({ success: true, sent, message: 'Lembrete enviado com sucesso.' });
+  } catch (error) {
+    console.error('Erro ao enviar lembrete:', error);
+    res.status(500).json({ error: 'Erro ao enviar lembrete de inatividade.' });
+  }
+});
+
+// ==========================================
+// ROTAS DE CHECK-IN SEMANAL AUTOMATIZADO 📋
+// ==========================================
+
+// Submeter Check-in Semanal pelo Aluno (POST) - Protegido
+app.post('/api/checkins', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const host = req.get('host') || 'localhost:3000';
+    const protocol = req.protocol || 'http';
+
+    const {
+      weight,
+      energyLevel,
+      dietAdherence,
+      sleepQuality,
+      painLevel,
+      painNotes,
+      notes,
+      frontPhotoBase64,
+      backPhotoBase64,
+      sidePhotoBase64,
+      frontPhotoUrl: initialFrontPhoto,
+      backPhotoUrl: initialBackPhoto,
+      sidePhotoUrl: initialSidePhoto,
+    } = req.body;
+
+    if (!weight) {
+      return res.status(400).json({ error: 'O peso em jejum é obrigatório para o check-in.' });
+    }
+
+    let frontPhotoUrl = initialFrontPhoto || null;
+    let backPhotoUrl = initialBackPhoto || null;
+    let sidePhotoUrl = initialSidePhoto || null;
+
+    if (frontPhotoBase64 && frontPhotoBase64.length > 50) {
+      const saved = await saveUploadedImage(frontPhotoBase64, host, protocol);
+      frontPhotoUrl = saved.url;
+    }
+    if (backPhotoBase64 && backPhotoBase64.length > 50) {
+      const saved = await saveUploadedImage(backPhotoBase64, host, protocol);
+      backPhotoUrl = saved.url;
+    }
+    if (sidePhotoBase64 && sidePhotoBase64.length > 50) {
+      const saved = await saveUploadedImage(sidePhotoBase64, host, protocol);
+      sidePhotoUrl = saved.url;
+    }
+
+    const checkIn = await prisma.weeklyCheckIn.create({
+      data: {
+        userId,
+        weight: Number(weight),
+        energyLevel: energyLevel ? Number(energyLevel) : 7,
+        dietAdherence: dietAdherence ? Number(dietAdherence) : 8,
+        sleepQuality: sleepQuality ? Number(sleepQuality) : 7,
+        painLevel: painLevel !== undefined ? Number(painLevel) : 0,
+        painNotes: painNotes ? String(painNotes).trim() : null,
+        notes: notes ? String(notes).trim() : null,
+        frontPhotoUrl,
+        backPhotoUrl,
+        sidePhotoUrl,
+      },
+    });
+
+    // Também adiciona ao histórico de BodyMetric para refletir no peso geral
+    await prisma.bodyMetric.create({
+      data: {
+        userId,
+        weight: Number(weight),
+        photoUrl: frontPhotoUrl || undefined,
+        notes: `Check-in Semanal (Adesão: ${dietAdherence || 8}/10, Energia: ${energyLevel || 7}/10)`,
+      },
+    });
+
+    // Notificar treinadores do aluno via Push
+    const student = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    const studentName = student?.name || 'Aluno';
+    const hasPain = checkIn.painLevel && checkIn.painLevel > 0;
+
+    if (hasPain) {
+      notifyCoachesOfClient(
+        prisma,
+        userId,
+        `⚠️ Check-in com Dor: ${studentName}`,
+        `${studentName} reportou nível de dor ${checkIn.painLevel}/10: "${checkIn.painNotes || 'Sem detalhes'}"`,
+        { type: 'CHECKIN_PAIN_ALERT', checkInId: checkIn.id }
+      ).catch((e) => console.error('Erro push dor check-in:', e));
+    } else {
+      notifyCoachesOfClient(
+        prisma,
+        userId,
+        `📋 Novo Check-in Semanal: ${studentName}`,
+        `${studentName} enviou o check-in semanal (${checkIn.weight}kg, Adesão dieta: ${checkIn.dietAdherence}/10).`,
+        { type: 'CHECKIN_SUBMITTED', checkInId: checkIn.id }
+      ).catch((e) => console.error('Erro push check-in:', e));
+    }
+
+    console.log(`✅ Check-in semanal registado para ${userId}: ${weight}kg`);
+    res.status(201).json(checkIn);
+  } catch (error) {
+    console.error('Erro ao submeter check-in semanal:', error);
+    res.status(500).json({ error: 'Erro interno ao submeter o check-in semanal.' });
+  }
+});
+
+// Obter os meus Check-ins (Aluno) (GET) - Protegido
+app.get('/api/checkins/my', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const checkIns = await prisma.weeklyCheckIn.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.status(200).json(checkIns);
+  } catch (error) {
+    console.error('Erro ao listar check-ins do aluno:', error);
+    res.status(500).json({ error: 'Erro ao carregar check-ins.' });
+  }
+});
+
+// Obter Check-ins de um aluno (Treinador) (GET) - Protegido
+app.get('/api/checkins/client/:clientId', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const callerId = req.user!.id;
+    const callerRole = req.user!.role;
+    const clientId = toStr(req.params.clientId);
+
+    if (callerId !== clientId) {
+      if (callerRole !== 'COACH' || !(await isCoachOfClient(callerId, clientId))) {
+        return res.status(403).json({ error: 'Acesso negado aos check-ins deste aluno.' });
+      }
+    }
+
+    const checkIns = await prisma.weeklyCheckIn.findMany({
+      where: { userId: clientId },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.status(200).json(checkIns);
+  } catch (error) {
+    console.error('Erro ao obter check-ins do cliente:', error);
+    res.status(500).json({ error: 'Erro ao obter check-ins do aluno.' });
+  }
+});
+
+// Personal Trainer envia feedback ao Check-in (PATCH) - Protegido
+app.patch('/api/checkins/:checkInId/feedback', authenticateToken, requireActiveCoach, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const coachId = req.user!.id;
+    const checkInId = toStr(req.params.checkInId);
+    const { coachFeedback } = req.body;
+
+    if (!coachFeedback || !String(coachFeedback).trim()) {
+      return res.status(400).json({ error: 'O texto de feedback é obrigatório.' });
+    }
+
+    const checkIn = await prisma.weeklyCheckIn.findUnique({
+      where: { id: checkInId },
+      include: { user: { select: { id: true, name: true } } },
+    });
+
+    if (!checkIn) {
+      return res.status(404).json({ error: 'Check-in não encontrado.' });
+    }
+
+    const isCoach = await isCoachOfClient(coachId, checkIn.userId);
+    if (!isCoach) {
+      return res.status(403).json({ error: 'Não tens autorização para rever este check-in.' });
+    }
+
+    const updated = await prisma.weeklyCheckIn.update({
+      where: { id: checkInId },
+      data: {
+        coachFeedback: String(coachFeedback).trim(),
+        reviewedAt: new Date(),
+      },
+    });
+
+    const coach = await prisma.user.findUnique({ where: { id: coachId }, select: { name: true } });
+    notifyUser(
+      prisma,
+      checkIn.userId,
+      '💬 Feedback do Treinador!',
+      `${coach?.name || 'O teu treinador'} respondeu ao teu check-in semanal: "${coachFeedback.slice(0, 80)}..."`,
+      { type: 'CHECKIN_FEEDBACK', checkInId }
+    ).catch((e) => console.error('Erro push feedback checkin:', e));
+
+    console.log(`💬 Feedback de check-in guardado para ${checkIn.userId}`);
+    res.status(200).json(updated);
+  } catch (error) {
+    console.error('Erro ao enviar feedback de check-in:', error);
+    res.status(500).json({ error: 'Erro ao registar feedback.' });
+  }
+});
+
+// ==========================================
+// ROTAS DE ANALYTICS & GRÁFICOS DE EVOLUÇÃO 📊
+// ==========================================
+
+// Obter dados agregados para gráficos de Peso e Carga Máxima/1RM (GET) - Protegido
+app.get('/api/analytics/progress/:userId', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const callerId = req.user!.id;
+    const callerRole = req.user!.role;
+    const userId = toStr(req.params.userId);
+
+    if (callerId !== userId) {
+      if (callerRole !== 'COACH' || !(await isCoachOfClient(callerId, userId))) {
+        return res.status(403).json({ error: 'Acesso negado aos gráficos deste utilizador.' });
+      }
+    }
+
+    // 1. Histórico de Peso (combina BodyMetric e WeeklyCheckIn)
+    const [bodyMetrics, checkIns] = await Promise.all([
+      prisma.bodyMetric.findMany({
+        where: { userId },
+        select: { createdAt: true, weight: true },
+        orderBy: { createdAt: 'asc' },
+      }),
+      prisma.weeklyCheckIn.findMany({
+        where: { userId },
+        select: { createdAt: true, weight: true },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
+
+    // Unificar e ordenar por data
+    const weightMap = new Map<string, number>();
+    for (const m of bodyMetrics) {
+      const dateStr = m.createdAt.toISOString().split('T')[0];
+      weightMap.set(dateStr, m.weight);
+    }
+    for (const c of checkIns) {
+      const dateStr = c.createdAt.toISOString().split('T')[0];
+      weightMap.set(dateStr, c.weight);
+    }
+
+    const weightHistory = Array.from(weightMap.entries())
+      .map(([date, weight]) => ({ date, weight }))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // 2. Histórico de 1RM e Cargas por Exercício
+    const setLogs = await prisma.workoutSetLog.findMany({
+      where: {
+        completed: true,
+        weight: { gt: 0 },
+        reps: { gt: 0 },
+        workoutLog: { userId },
+      },
+      select: {
+        exerciseName: true,
+        weight: true,
+        reps: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const exerciseMap: Record<string, Map<string, { maxWeight: number; reps: number; estimated1RM: number }>> = {};
+
+    for (const set of setLogs) {
+      const exName = set.exerciseName.trim();
+      if (!exName) continue;
+
+      const dateStr = set.createdAt.toISOString().split('T')[0];
+      const weight = set.weight || 0;
+      const reps = set.reps || 1;
+      const estimated1RM = Math.round((weight * (1 + reps / 30)) * 10) / 10;
+
+      if (!exerciseMap[exName]) {
+        exerciseMap[exName] = new Map();
+      }
+
+      const existing = exerciseMap[exName].get(dateStr);
+      if (!existing || estimated1RM > existing.estimated1RM) {
+        exerciseMap[exName].set(dateStr, { maxWeight: weight, reps, estimated1RM });
+      }
+    }
+
+    const strengthHistory: Array<{
+      exerciseName: string;
+      dataPointsCount: number;
+      sessions: Array<{ date: string; maxWeight: number; reps: number; estimated1RM: number }>;
+    }> = [];
+
+    for (const [exerciseName, sessionMap] of Object.entries(exerciseMap)) {
+      const sessions = Array.from(sessionMap.entries())
+        .map(([date, data]) => ({ date, ...data }))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      strengthHistory.push({
+        exerciseName,
+        dataPointsCount: sessions.length,
+        sessions,
+      });
+    }
+
+    strengthHistory.sort((a, b) => b.dataPointsCount - a.dataPointsCount);
+
+    res.status(200).json({
+      weightHistory,
+      strengthHistory,
+    });
+  } catch (error) {
+    console.error('Erro ao calcular histórico analítico:', error);
+    res.status(500).json({ error: 'Erro ao gerar dados analíticos para gráficos.' });
+  }
+});
+
+// ==========================================
+// ROTAS DE CHAT PRIVADO (PT ↔ ALUNO) 💬
+// ==========================================
+
+// Listar conversas disponíveis (GET) - Protegido
+app.get('/api/chat/conversations', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const callerId = req.user!.id;
+    const callerRole = req.user!.role;
+
+    if (callerRole === 'COACH') {
+      const activeClients = await prisma.coachClient.findMany({
+        where: { coachId: callerId },
+        include: {
+          client: {
+            select: { id: true, name: true, email: true, picture: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const conversations = await Promise.all(
+        activeClients.map(async (rel) => {
+          const client = rel.client;
+          const lastMessage = await prisma.chatMessage.findFirst({
+            where: { coachId: callerId, clientId: client.id },
+            orderBy: { createdAt: 'desc' },
+            select: { id: true, text: true, mediaType: true, createdAt: true, senderId: true, isRead: true },
+          });
+
+          const unreadCount = await prisma.chatMessage.count({
+            where: {
+              coachId: callerId,
+              clientId: client.id,
+              senderId: client.id,
+              isRead: false,
+            },
+          });
+
+          return {
+            targetUser: client,
+            lastMessage,
+            unreadCount,
+          };
+        })
+      );
+
+      // Ordenar pelas conversas com mensagens mais recentes
+      conversations.sort((a, b) => {
+        const timeA = a.lastMessage ? new Date(a.lastMessage.createdAt).getTime() : 0;
+        const timeB = b.lastMessage ? new Date(b.lastMessage.createdAt).getTime() : 0;
+        return timeB - timeA;
+      });
+
+      return res.status(200).json(conversations);
+    } else {
+      // Aluno: busca o seu treinador
+      const coachRel = await prisma.coachClient.findFirst({
+        where: { clientId: callerId },
+        include: {
+          coach: {
+            select: { id: true, name: true, email: true, picture: true, coachBrandName: true },
+          },
+        },
+      });
+
+      if (!coachRel || !coachRel.coach) {
+        return res.status(200).json([]);
+      }
+
+      const coach = coachRel.coach;
+      const lastMessage = await prisma.chatMessage.findFirst({
+        where: { coachId: coach.id, clientId: callerId },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, text: true, mediaType: true, createdAt: true, senderId: true, isRead: true },
+      });
+
+      const unreadCount = await prisma.chatMessage.count({
+        where: {
+          coachId: coach.id,
+          clientId: callerId,
+          senderId: coach.id,
+          isRead: false,
+        },
+      });
+
+      return res.status(200).json([
+        {
+          targetUser: coach,
+          lastMessage,
+          unreadCount,
+        },
+      ]);
+    }
+  } catch (error) {
+    console.error('Erro ao listar conversas de chat:', error);
+    res.status(500).json({ error: 'Erro ao carregar conversas.' });
+  }
+});
+
+// Obter histórico de mensagens entre PT e Aluno (GET) - Protegido
+app.get('/api/chat/:targetUserId/messages', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const callerId = req.user!.id;
+    const callerRole = req.user!.role;
+    const targetUserId = toStr(req.params.targetUserId);
+
+    let coachId = '';
+    let clientId = '';
+
+    if (callerRole === 'COACH') {
+      coachId = callerId;
+      clientId = targetUserId;
+      const isClient = await isCoachOfClient(callerId, targetUserId);
+      if (!isClient) {
+        return res.status(403).json({ error: 'Acesso negado às mensagens deste aluno.' });
+      }
+    } else {
+      clientId = callerId;
+      coachId = targetUserId;
+      const isCoach = await isCoachOfClient(targetUserId, callerId);
+      if (!isCoach) {
+        return res.status(403).json({ error: 'Acesso negado às mensagens com este treinador.' });
+      }
+    }
+
+    const messages = await prisma.chatMessage.findMany({
+      where: { coachId, clientId },
+      orderBy: { createdAt: 'asc' },
+      take: 100,
+      include: {
+        sender: { select: { id: true, name: true, role: true, picture: true } },
+      },
+    });
+
+    // Marcar como lidas as mensagens recebidas
+    await prisma.chatMessage.updateMany({
+      where: {
+        coachId,
+        clientId,
+        senderId: targetUserId,
+        isRead: false,
+      },
+      data: { isRead: true },
+    });
+
+    res.status(200).json(messages);
+  } catch (error) {
+    console.error('Erro ao obter mensagens do chat:', error);
+    res.status(500).json({ error: 'Erro ao carregar histórico de mensagens.' });
+  }
+});
+
+// Enviar mensagem no chat (texto, áudio, vídeo, foto, ficheiro) (POST) - Protegido
+app.post('/api/chat/:targetUserId/messages', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const callerId = req.user!.id;
+    const callerRole = req.user!.role;
+    const targetUserId = toStr(req.params.targetUserId);
+    const { text, mediaBase64, mediaType, fileName } = req.body;
+
+    if (!text && !mediaBase64) {
+      return res.status(400).json({ error: 'A mensagem deve conter texto ou anexo multimédia.' });
+    }
+
+    let coachId = '';
+    let clientId = '';
+    let recipientId = '';
+
+    if (callerRole === 'COACH') {
+      coachId = callerId;
+      clientId = targetUserId;
+      recipientId = targetUserId;
+      const isClient = await isCoachOfClient(callerId, targetUserId);
+      if (!isClient) {
+        return res.status(403).json({ error: 'Não podes enviar mensagens a este utilizador.' });
+      }
+    } else {
+      clientId = callerId;
+      coachId = targetUserId;
+      recipientId = targetUserId;
+      const isCoach = await isCoachOfClient(targetUserId, callerId);
+      if (!isCoach) {
+        return res.status(403).json({ error: 'Não podes enviar mensagens a este treinador.' });
+      }
+    }
+
+    let mediaUrl: string | null = null;
+    if (mediaBase64 && mediaBase64.length > 20) {
+      const host = req.get('host') || 'localhost:3000';
+      const protocol = req.protocol || 'http';
+      const saved = await saveUploadedMedia(mediaBase64, host, protocol, mediaType || 'IMAGE', fileName);
+      mediaUrl = saved.url;
+    }
+
+    const newMessage = await prisma.chatMessage.create({
+      data: {
+        coachId,
+        clientId,
+        senderId: callerId,
+        text: text ? String(text).trim() : null,
+        mediaUrl,
+        mediaType: mediaType || (mediaUrl ? 'IMAGE' : 'TEXT'),
+        fileName: fileName ? String(fileName).trim() : null,
+      },
+      include: {
+        sender: { select: { id: true, name: true, role: true, picture: true } },
+      },
+    });
+
+    // Envio de Notificação Push ao Destinatário
+    const sender = await prisma.user.findUnique({ where: { id: callerId }, select: { name: true } });
+    const senderName = sender?.name || (callerRole === 'COACH' ? 'Treinador' : 'Aluno');
+
+    let previewContent = text ? String(text).trim() : '';
+    if (!previewContent) {
+      if (mediaType === 'AUDIO') previewContent = '🎙️ Enviou uma nota de áudio';
+      else if (mediaType === 'VIDEO') previewContent = '🎥 Enviou um vídeo de execução técnica';
+      else if (mediaType === 'IMAGE') previewContent = '📷 Enviou uma fotografia';
+      else previewContent = '📎 Enviou um anexo';
+    }
+
+    notifyUser(
+      prisma,
+      recipientId,
+      `💬 ${senderName}`,
+      previewContent.length > 80 ? `${previewContent.slice(0, 77)}...` : previewContent,
+      {
+        type: 'CHAT_MESSAGE',
+        senderId: callerId,
+        coachId,
+        clientId,
+      }
+    ).catch((err) => console.error('Erro ao disparar push de chat:', err));
+
+    console.log(`💬 Mensagem de chat enviada de ${callerId} para ${recipientId} (${mediaType || 'TEXT'})`);
+    res.status(201).json(newMessage);
+  } catch (error) {
+    console.error('Erro ao enviar mensagem de chat:', error);
+    res.status(500).json({ error: 'Erro ao enviar mensagem.' });
+  }
+});
+
+// Marcar mensagens como lidas (PATCH) - Protegido
+app.patch('/api/chat/:targetUserId/read', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const callerId = req.user!.id;
+    const callerRole = req.user!.role;
+    const targetUserId = toStr(req.params.targetUserId);
+
+    let coachId = '';
+    let clientId = '';
+
+    if (callerRole === 'COACH') {
+      coachId = callerId;
+      clientId = targetUserId;
+    } else {
+      clientId = callerId;
+      coachId = targetUserId;
+    }
+
+    await prisma.chatMessage.updateMany({
+      where: {
+        coachId,
+        clientId,
+        senderId: targetUserId,
+        isRead: false,
+      },
+      data: { isRead: true },
+    });
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Erro ao marcar mensagens como lidas:', error);
+    res.status(500).json({ error: 'Erro ao atualizar estado de leitura.' });
   }
 });
 

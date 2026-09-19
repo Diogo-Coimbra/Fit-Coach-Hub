@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
-    "scheme": "fit-ai-tracker",
+    "name": "Fit Coach Hub",
+    "slug": "fit-coach-hub",
+    "scheme": "fitcoachhub",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,16 +13,28 @@
       "backgroundColor": "#0B0D10"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.diogocoimbra.fitcoachhub",
+      "infoPlist": {
+        "NSCameraUsageDescription": "A aplicação necessita de acesso à câmara para fotografar pratos para cálculo de calorias por IA e fotos de evolução corporal.",
+        "NSMicrophoneUsageDescription": "A aplicação necessita de acesso ao microfone para permitir o envio de notas de voz no chat com o treinador.",
+        "NSPhotoLibraryUsageDescription": "A aplicação necessita de acesso à galeria de fotos para envio de check-ins semanais e registo de refeições."
+      }
     },
     "android": {
+      "package": "com.diogocoimbra.fitcoachhub",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0B0D10",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png",
-        "package": "com.diogocoimbra.fitaitracker"
+        "monochromeImage": "./assets/android-icon-monochrome.png"
       },
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -32,7 +44,16 @@
       "expo-web-browser",
       "expo-secure-store",
       "expo-sharing",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-audio",
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Aceder à galeria para fotos de evolução corporal e refeições.",
+          "cameraPermission": "Utilizar a câmara para registo fotográfico de refeições e check-in."
+        }
+      ]
     ]
   }
 }

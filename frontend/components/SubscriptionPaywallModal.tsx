@@ -146,32 +146,32 @@ export default function SubscriptionPaywallModal({
             <View style={styles.featuresList}>
               <View style={styles.featureItem}>
                 <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
-                <Text style={styles.featureText}>Gestão ilimitada de alunos e fichas clínicas</Text>
+                <Text style={styles.featureText}>{t('subscription.featureUnlimitedStudents')}</Text>
               </View>
 
               <View style={styles.featureItem}>
                 <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
-                <Text style={styles.featureText}>Biblioteca e prescrição direta de modelos de treino</Text>
+                <Text style={styles.featureText}>{t('subscription.featureTemplates')}</Text>
               </View>
 
               <View style={styles.featureItem}>
                 <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
-                <Text style={styles.featureText}>Prescrição de calorias e macronutrientes personalizados</Text>
+                <Text style={styles.featureText}>{t('subscription.featureNutrition')}</Text>
               </View>
 
               <View style={styles.featureItem}>
                 <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
-                <Text style={styles.featureText}>Avaliações físicas completas e fotografias de evolução</Text>
+                <Text style={styles.featureText}>{t('subscription.featureAssessments')}</Text>
               </View>
 
               <View style={styles.featureItem}>
                 <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
-                <Text style={styles.featureText}>Criação acelerada de treinos com Inteligência Artificial</Text>
+                <Text style={styles.featureText}>{t('subscription.featureAI')}</Text>
               </View>
 
               <View style={styles.featureItem}>
                 <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
-                <Text style={styles.featureText}>Painel anti-churn com alertas de abandono de alunos</Text>
+                <Text style={styles.featureText}>{t('subscription.featureRetention')}</Text>
               </View>
             </View>
 

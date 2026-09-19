@@ -20,6 +20,9 @@ import HistoryScreen from './screens/HistoryScreen';
 import NutritionScreen from './screens/NutritionScreen';
 import ClientDetailsScreen from './screens/ClientDetailsScreen';
 import TemplatesScreen from './screens/TemplatesScreen';
+import ChatScreen from './screens/ChatScreen';
+
+import { registerForPushNotificationsAsync } from './services/notifications';
 
 const Stack = createNativeStackNavigator();
 
@@ -33,6 +36,14 @@ export default function App() {
     initTheme();
     initLanguage();
   }, []);
+
+  useEffect(() => {
+    if (user?.id) {
+      registerForPushNotificationsAsync().catch((err) =>
+        console.log('[App] Registo de push notifications:', err?.message)
+      );
+    }
+  }, [user?.id]);
 
   const navTheme = {
     ...DefaultTheme,
@@ -73,6 +84,7 @@ export default function App() {
               <Stack.Screen name="Nutrition" component={NutritionScreen} />
               <Stack.Screen name="ClientDetails" component={ClientDetailsScreen} />
               <Stack.Screen name="Templates" component={TemplatesScreen} />
+              <Stack.Screen name="Chat" component={ChatScreen} />
             </>
           ) : (
             <Stack.Screen name="Login" component={LoginScreen} />

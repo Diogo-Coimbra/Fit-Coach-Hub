@@ -20,6 +20,9 @@ import { ColorScheme, radius, space } from '../theme';
 import { api } from '../services/api';
 import { useTheme } from '../store/useThemeStore';
 import { useLanguage } from '../store/useLanguageStore';
+import { SubstituteExerciseModal } from '../components/SubstituteExerciseModal';
+import { ExerciseGuideModal } from '../components/ExerciseGuideModal';
+import WorkoutFeedbackModal from '../components/WorkoutFeedbackModal';
 
 export type SetType = 'NORMAL' | 'WARMUP' | 'DROPSET' | 'FAILURE';
 
@@ -51,6 +54,10 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
   const styles = useMemo(() => getStyles(colors), [colors]);
 
   const [workoutDetails, setWorkoutDetails] = useState<any>(null);
+  const isAssignedByCoach = !!workoutDetails?.assignedById || !!workoutDetails?.assignedBy;
+  const isCoach = user?.role === 'COACH';
+  const canEditStructure = isCoach || !isAssignedByCoach;
+
   const [isLoading, setIsLoading] = useState(true);
   const [isFinishing, setIsFinishing] = useState(false);
   const [isCloning, setIsCloning] = useState(false);
@@ -61,6 +68,38 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
   // Estrutura de séries executadas por exercício: { [exerciseId]: ExerciseSetLogState[] }
   const [exerciseSets, setExerciseSets] = useState<Record<string, ExerciseSetLogState[]>>({});
   const [workoutNotes, setWorkoutNotes] = useState('');
+
+  // Modais de Substituição de Exercício e Guia de Execução Técnica
+  const [substituteModalVisible, setSubstituteModalVisible] = useState(false);
+  const [substituteTarget, setSubstituteTarget] = useState<any>(null);
+  const [guideModalVisible, setGuideModalVisible] = useState(false);
+  const [guideTarget, setGuideTarget] = useState<any>(null);
+  const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
+
+  const handleSubstitute = async (newExerciseName: string) => {
+    if (!substituteTarget?.id) return;
+    await api.put(`/api/exercises/${substituteTarget.id}`, {
+      name: newExerciseName,
+    });
+    setWorkoutDetails((prev: any) => ({
+      ...prev,
+      exercises: prev.exercises.map((ex: any) =>
+        ex.id === substituteTarget.id ? { ...ex, name: newExerciseName } : ex
+      ),
+    }));
+  };
+
+  const handleSaveVideoUrl = async (exerciseId: string, url: string) => {
+    await api.put(`/api/exercises/${exerciseId}`, {
+      videoUrl: url,
+    });
+    setWorkoutDetails((prev: any) => ({
+      ...prev,
+      exercises: prev.exercises.map((ex: any) =>
+        ex.id === exerciseId ? { ...ex, videoUrl: url } : ex
+      ),
+    }));
+  };
 
   // Temporizador de descanso
   const [timeLeft, setTimeLeft] = useState(0);
@@ -326,7 +365,16 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
     });
   };
 
-  const handleFinishWorkout = async () => {
+  const handleFinishWorkout = () => {
+    setFeedbackModalVisible(true);
+  };
+
+  const submitWorkoutWithFeedback = async (feedback: {
+    rpe: number;
+    painJoints: string;
+    painLevel: number;
+    notes: string;
+  }) => {
     if (!user?.id || !workoutDetails?.id) return;
 
     setIsFinishing(true);
@@ -352,13 +400,19 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
         });
       });
 
+      const combinedNotes = [workoutNotes.trim(), feedback.notes.trim()].filter(Boolean).join(' | ');
+
       await api.post('/api/logs', {
         workoutId: workoutDetails.id,
         durationMinutes,
-        notes: workoutNotes.trim() || undefined,
+        notes: combinedNotes || undefined,
+        rpe: feedback.rpe,
+        painJoints: feedback.painJoints,
+        painLevel: feedback.painLevel,
         sets: flatSets,
       });
 
+      setFeedbackModalVisible(false);
       showAlert(t('workouts.workoutFinishedTitle'), t('workouts.workoutFinishedMsg', { duration: durationMinutes }));
       navigation.navigate('Dashboard');
     } catch (error: any) {
@@ -469,17 +523,41 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
           </View>
           <View style={styles.headerActions}>
             <TouchableOpacity
-              style={styles.headerIconBtn}
-              onPress={() => navigation.navigate('EditExercise', { exercise: item })}
+              style={[styles.headerIconBtn, { backgroundColor: 'rgba(59, 130, 246, 0.12)' }]}
+              onPress={() => {
+                setGuideTarget(item);
+                setGuideModalVisible(true);
+              }}
             >
-              <Ionicons name="pencil-outline" size={17} color={colors.muted} />
+              <Ionicons name="play-circle-outline" size={18} color="#3B82F6" />
             </TouchableOpacity>
+
             <TouchableOpacity
-              style={styles.headerIconBtn}
-              onPress={() => handleDeleteExercise(item.id, item.name)}
+              style={[styles.headerIconBtn, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}
+              onPress={() => {
+                setSubstituteTarget(item);
+                setSubstituteModalVisible(true);
+              }}
             >
-              <Ionicons name="trash-outline" size={17} color={colors.danger} />
+              <Ionicons name="swap-horizontal-outline" size={18} color="#10B981" />
             </TouchableOpacity>
+
+            {canEditStructure && (
+              <>
+                <TouchableOpacity
+                  style={styles.headerIconBtn}
+                  onPress={() => navigation.navigate('EditExercise', { exercise: item })}
+                >
+                  <Ionicons name="pencil-outline" size={17} color={colors.muted} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.headerIconBtn}
+                  onPress={() => handleDeleteExercise(item.id, item.name)}
+                >
+                  <Ionicons name="trash-outline" size={17} color={colors.danger} />
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
 
@@ -621,6 +699,14 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
             <ActivityIndicator color={colors.accent} style={{ marginVertical: 20 }} />
           ) : (
             <View style={styles.workoutMeta}>
+              {workoutDetails?.assignedBy ? (
+                <View style={styles.prescribedBadge}>
+                  <Ionicons name="shield-checkmark" size={13} color={colors.accent} />
+                  <Text style={styles.prescribedBadgeText}>
+                    {t('checkin.prescribedByCoach')}: {workoutDetails.assignedBy.name}
+                  </Text>
+                </View>
+              ) : null}
               <Title>{workoutDetails?.name}</Title>
               {workoutDetails?.description ? (
                 <Text style={styles.description}>{workoutDetails.description}</Text>
@@ -681,12 +767,14 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
           ListHeaderComponent={
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionHeading}>{t('workouts.prescribedExercises')}</Text>
-              <Button
-                title={t('workouts.addExercise')}
-                variant="secondary"
-                icon="add"
-                onPress={() => navigation.navigate('AddExercise', { workoutId: workoutDetails?.id })}
-              />
+              {canEditStructure && (
+                <Button
+                  title={t('workouts.addExercise')}
+                  variant="secondary"
+                  icon="add"
+                  onPress={() => navigation.navigate('AddExercise', { workoutId: workoutDetails?.id })}
+                />
+              )}
             </View>
           }
           ListEmptyComponent={
@@ -720,15 +808,39 @@ export default function WorkoutDetailsScreen({ route, navigation }: any) {
                 onPress={handleCloneWorkout}
                 loading={isCloning}
               />
-              <Button
-                title={t('common.delete')}
-                variant="danger"
-                onPress={handleDeleteWorkout}
-              />
+              {canEditStructure && (
+                <Button
+                  title={t('common.delete')}
+                  variant="danger"
+                  onPress={handleDeleteWorkout}
+                />
+              )}
             </View>
           }
         />
       </KeyboardAvoidingView>
+
+      <SubstituteExerciseModal
+        visible={substituteModalVisible}
+        currentExerciseName={substituteTarget?.name || ''}
+        onClose={() => setSubstituteModalVisible(false)}
+        onSubstitute={handleSubstitute}
+      />
+
+      <ExerciseGuideModal
+        visible={guideModalVisible}
+        exercise={guideTarget}
+        onClose={() => setGuideModalVisible(false)}
+        onSaveVideoUrl={handleSaveVideoUrl}
+        isCoach={user?.role === 'COACH'}
+      />
+
+      <WorkoutFeedbackModal
+        visible={feedbackModalVisible}
+        onClose={() => setFeedbackModalVisible(false)}
+        onSubmit={submitWorkoutWithFeedback}
+        isLoading={isFinishing}
+      />
     </Screen>
   );
 }
@@ -739,6 +851,24 @@ const getStyles = (colors: ColorScheme) => StyleSheet.create({
   },
   workoutMeta: {
     marginVertical: 4,
+  },
+  prescribedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.surface2,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: radius.full,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginBottom: 8,
+  },
+  prescribedBadgeText: {
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: '700',
   },
   description: {
     color: colors.muted,

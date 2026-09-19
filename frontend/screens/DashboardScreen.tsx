@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Image,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +18,7 @@ import { ColorScheme, radius, space } from '../theme';
 import { api } from '../services/api';
 import InviteModal from '../components/InviteModal';
 import SubscriptionPaywallModal from '../components/SubscriptionPaywallModal';
+import { WeeklyCheckInModal } from '../components/WeeklyCheckInModal';
 import { useTheme } from '../store/useThemeStore';
 import { useLanguage } from '../store/useLanguageStore';
 
@@ -31,6 +33,29 @@ export default function DashboardScreen({ navigation }: any) {
   // Estados Comuns
   const [isLoading, setIsLoading] = useState(true);
   const [showPaywallModal, setShowPaywallModal] = useState(false);
+  const [showCheckInModal, setShowCheckInModal] = useState(false);
+
+  // Enviar Lembrete / Push para Aluno Inativo
+  const handleSendInactiveReminder = async (clientId: string, clientName: string) => {
+    Alert.alert(
+      'Enviar Lembrete de Treino',
+      `Desejas enviar uma notificação push a incentivar ${clientName} a regressar aos treinos?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Enviar Notificação 🔔',
+          onPress: async () => {
+            try {
+              await api.post('/api/coach/notify-inactive', { clientId });
+              Alert.alert('Sucesso', `Notificação de incentivo enviada a ${clientName}!`);
+            } catch (err: any) {
+              Alert.alert('Erro', err.message || 'Erro ao enviar lembrete.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   // Estados do Treinador (COACH)
   const [clients, setClients] = useState<any[]>([]);
@@ -38,6 +63,7 @@ export default function DashboardScreen({ navigation }: any) {
 
   // Estados do Aluno (CLIENT)
   const [workouts, setWorkouts] = useState<any[]>([]);
+  const [selectedRoutineFilter, setSelectedRoutineFilter] = useState<string>('ALL');
   const [totalLogs, setTotalLogs] = useState(0);
   const [weeklyLogs, setWeeklyLogs] = useState(0);
   const [totalMinutes, setTotalMinutes] = useState(0);
@@ -196,8 +222,29 @@ export default function DashboardScreen({ navigation }: any) {
             </View>
           </View>
 
-          <View style={styles.clientAction}>
-            <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <TouchableOpacity
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onPress={() =>
+                navigation.navigate('Chat', {
+                  targetUserId: item.id,
+                  targetUserName: item.name || 'Aluno',
+                  targetUserRole: 'Aluno',
+                })
+              }
+            >
+              <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.accent} />
+            </TouchableOpacity>
+            <View style={styles.clientAction}>
+              <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+            </View>
           </View>
         </TouchableOpacity>
       );
@@ -279,21 +326,28 @@ export default function DashboardScreen({ navigation }: any) {
                   </Text>
                   <View style={styles.alertsList}>
                     {atRiskClients.slice(0, 3).map((client) => (
-                      <TouchableOpacity
-                        key={client.id}
-                        style={styles.alertItem}
-                        onPress={() => navigation.navigate('ClientDetails', { clientId: client.id })}
-                      >
-                        <View style={styles.alertItemInfo}>
-                          <Text style={styles.alertItemName}>{client.name}</Text>
-                          <Text style={styles.alertItemDesc}>
-                            {client.daysSinceLastWorkout !== null
-                              ? t('dashboard.lastWorkoutDays', { days: client.daysSinceLastWorkout })
-                              : t('dashboard.notStartedYet')}
-                          </Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-                      </TouchableOpacity>
+                      <View key={client.id} style={styles.alertRowContainer}>
+                        <TouchableOpacity
+                          style={styles.alertItem}
+                          onPress={() => navigation.navigate('ClientDetails', { clientId: client.id })}
+                        >
+                          <View style={styles.alertItemInfo}>
+                            <Text style={styles.alertItemName}>{client.name}</Text>
+                            <Text style={styles.alertItemDesc}>
+                              {client.daysSinceLastWorkout !== null
+                                ? t('dashboard.lastWorkoutDays', { days: client.daysSinceLastWorkout })
+                                : t('dashboard.notStartedYet')}
+                            </Text>
+                          </View>
+                          <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.pingBtn}
+                          onPress={() => handleSendInactiveReminder(client.id, client.name)}
+                        >
+                          <Ionicons name="notifications-outline" size={18} color={colors.accent} />
+                        </TouchableOpacity>
+                      </View>
                     ))}
                   </View>
                 </Card>
@@ -401,6 +455,9 @@ export default function DashboardScreen({ navigation }: any) {
 
   const progressPercent = Math.min((weeklyLogs / WEEKLY_GOAL) * 100, 100);
 
+  const availableRoutineTags = Array.from(new Set(workouts.map((w: any) => w.routineTag).filter(Boolean))).sort();
+  const displayedWorkouts = selectedRoutineFilter === 'ALL' ? workouts : workouts.filter((w: any) => w.routineTag === selectedRoutineFilter);
+
   const renderWorkoutCard = ({ item }: any) => (
     <TouchableOpacity
       style={styles.workoutCard}
@@ -408,6 +465,16 @@ export default function DashboardScreen({ navigation }: any) {
       activeOpacity={0.8}
     >
       <View style={styles.workoutText}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+          {item.routineTag ? (
+            <View style={{ backgroundColor: colors.accent + '25', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+              <Text style={{ color: colors.accent, fontSize: 11, fontWeight: '800' }}>DIVISÃO {item.routineTag}</Text>
+            </View>
+          ) : null}
+          {item.programName ? (
+            <Text style={{ color: colors.muted, fontSize: 12, fontWeight: '600' }}>{item.programName}</Text>
+          ) : null}
+        </View>
         <Text style={styles.workoutName}>{item.name}</Text>
         <Text style={styles.workoutDescription} numberOfLines={1}>
           {item.assignedBy?.name
@@ -422,7 +489,7 @@ export default function DashboardScreen({ navigation }: any) {
   return (
     <Screen>
       <FlatList
-        data={workouts}
+        data={displayedWorkouts}
         keyExtractor={(item) => item.id}
         renderItem={renderWorkoutCard}
         contentContainerStyle={styles.list}
@@ -444,15 +511,30 @@ export default function DashboardScreen({ navigation }: any) {
               </TouchableOpacity>
             </View>
 
-            {/* Banner de Treinador Associado */}
+            {/* Banner de Treinador Associado com Acesso ao Chat */}
             {coach ? (
-              <Card style={styles.coachBanner}>
-                <Ionicons name="shield-checkmark" size={20} color={colors.accent} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.coachBannerTitle}>{t('dashboard.yourCoach')}</Text>
-                  <Text style={styles.coachBannerName}>{coach.name}</Text>
-                </View>
-              </Card>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() =>
+                  navigation.navigate('Chat', {
+                    targetUserId: coach.id,
+                    targetUserName: coach.name,
+                    targetUserRole: 'Personal Trainer',
+                  })
+                }
+              >
+                <Card style={styles.coachBanner}>
+                  <Ionicons name="shield-checkmark" size={22} color={colors.accent} />
+                  <View style={{ flex: 1, marginLeft: 6 }}>
+                    <Text style={styles.coachBannerTitle}>{t('dashboard.yourCoach')}</Text>
+                    <Text style={styles.coachBannerName}>{coach.name}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.accent + '20', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16, gap: 4 }}>
+                    <Ionicons name="chatbubble-ellipses-outline" size={15} color={colors.accent} />
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.accent }}>Chat</Text>
+                  </View>
+                </Card>
+              </TouchableOpacity>
             ) : null}
 
             {/* Cartões de Estatísticas */}
@@ -487,6 +569,24 @@ export default function DashboardScreen({ navigation }: any) {
               </View>
             </Card>
 
+            {/* Banner de Check-in Semanal */}
+            <TouchableOpacity onPress={() => setShowCheckInModal(true)} style={styles.checkInCardWrap}>
+              <Card style={[styles.checkInCard, { borderColor: colors.accent }]}>
+                <View style={styles.checkInRow}>
+                  <View style={[styles.checkInIconBadge, { backgroundColor: colors.accent }]}>
+                    <Ionicons name="clipboard-outline" size={20} color={colors.bg} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.checkInTitle}>📋 {t('checkin.title')}</Text>
+                    <Text style={styles.checkInSubtitle}>
+                      {t('checkin.bannerSubtitle')}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.accent} />
+                </View>
+              </Card>
+            </TouchableOpacity>
+
             {/* Ações do Cliente */}
             <View style={styles.actions}>
               <TouchableOpacity style={styles.action} onPress={() => navigation.navigate('Nutrition')}>
@@ -504,6 +604,51 @@ export default function DashboardScreen({ navigation }: any) {
             </View>
 
             <Text style={styles.sectionTitle}>{t('dashboard.assignedWorkouts')}</Text>
+
+            {availableRoutineTags.length > 0 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                <TouchableOpacity
+                  style={[
+                    styles.routineChip,
+                    { backgroundColor: colors.bg, borderColor: colors.border },
+                    selectedRoutineFilter === 'ALL' && { backgroundColor: colors.accent, borderColor: colors.accent },
+                  ]}
+                  onPress={() => setSelectedRoutineFilter('ALL')}
+                >
+                  <Text
+                    style={[
+                      styles.routineChipText,
+                      { color: colors.text },
+                      selectedRoutineFilter === 'ALL' && { color: colors.bg, fontWeight: '700' },
+                    ]}
+                  >
+                    Todos ({workouts.length})
+                  </Text>
+                </TouchableOpacity>
+                {availableRoutineTags.map((tag: any) => (
+                  <TouchableOpacity
+                    key={`tag-${tag}`}
+                    style={[
+                      styles.routineChip,
+                      { backgroundColor: colors.bg, borderColor: colors.border },
+                      selectedRoutineFilter === tag && { backgroundColor: colors.accent, borderColor: colors.accent },
+                    ]}
+                    onPress={() => setSelectedRoutineFilter(tag)}
+                  >
+                    <Text
+                      style={[
+                        styles.routineChipText,
+                        { color: colors.text },
+                        selectedRoutineFilter === tag && { color: colors.bg, fontWeight: '700' },
+                      ]}
+                    >
+                      Treino {tag}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+
             {isLoading ? <ActivityIndicator color={colors.accent} style={{ marginVertical: 20 }} /> : null}
           </View>
         }
@@ -514,6 +659,12 @@ export default function DashboardScreen({ navigation }: any) {
             </Text>
           )
         }
+      />
+
+      <WeeklyCheckInModal
+        visible={showCheckInModal}
+        onClose={() => setShowCheckInModal(false)}
+        onSuccess={() => fetchClientData()}
       />
     </Screen>
   );
@@ -881,4 +1032,61 @@ const getStyles = (colors: ColorScheme) => StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+  alertRowContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  pingBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkInCardWrap: {
+    marginBottom: 12,
+  },
+  checkInCard: {
+    padding: 14,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  checkInRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  checkInIconBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkInTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  checkInSubtitle: {
+    color: colors.muted,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  routineChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    marginRight: 8,
+  },
+  routineChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
 });
+

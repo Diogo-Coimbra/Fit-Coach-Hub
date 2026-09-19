@@ -26,6 +26,8 @@ export default function CreateWorkoutScreen({ route, navigation }: any) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('Hipertrofia');
+  const [routineTag, setRoutineTag] = useState<string>('A');
+  const [programName, setProgramName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleCreateWorkout = async () => {
@@ -42,6 +44,8 @@ export default function CreateWorkoutScreen({ route, navigation }: any) {
           name: name.trim(),
           description: description.trim() || undefined,
           category,
+          routineTag: routineTag || undefined,
+          programName: programName.trim() || undefined,
         });
         navigation.replace('WorkoutDetails', { workoutId: newTemplate.id });
       } else {
@@ -49,6 +53,8 @@ export default function CreateWorkoutScreen({ route, navigation }: any) {
           name: name.trim(),
           description: description.trim() || undefined,
           targetClientId: targetClientId || undefined,
+          routineTag: routineTag || undefined,
+          programName: programName.trim() || undefined,
         });
         navigation.replace('WorkoutDetails', { workoutId: newWorkout.id });
       }
@@ -74,17 +80,50 @@ export default function CreateWorkoutScreen({ route, navigation }: any) {
 
   return (
     <Screen>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <ScrollView contentContainerStyle={styles.content}>
           <BackButton onPress={() => navigation.goBack()} />
+
           <Title>{pageTitle}</Title>
           <Subtitle>{pageSubtitle}</Subtitle>
+
+          {/* Divisão Semanal (A, B, C, D) */}
+          <View style={styles.categorySection}>
+            <Text style={styles.categoryLabel}>Divisão da Rotina / Semana:</Text>
+            <View style={styles.chipsRow}>
+              {['A', 'B', 'C', 'D', 'Nenhum'].map((tag) => {
+                const isSelected = (tag === 'Nenhum' && !routineTag) || routineTag === tag;
+                return (
+                  <TouchableOpacity
+                    key={tag}
+                    style={[styles.chip, isSelected && styles.chipActive]}
+                    onPress={() => setRoutineTag(tag === 'Nenhum' ? '' : tag)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
+                      {tag === 'Nenhum' ? 'Sem Letra' : `Treino ${tag}`}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
 
           <Field
             label={t('workouts.workoutNameLabel')}
             placeholder={t('workouts.workoutNamePlaceholder')}
             value={name}
             onChangeText={setName}
+          />
+
+          <Field
+            label="Programa ou Mesociclo (Opcional)"
+            placeholder="Ex: Mesociclo 1 - Hipertrofia (Semanas 1 a 6)"
+            value={programName}
+            onChangeText={setProgramName}
           />
 
           {isTemplate && (

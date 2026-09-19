@@ -167,7 +167,7 @@ export default function PhotoCompareModal({
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {/* Cabeçalho */}
           <View style={styles.header}>
-            <View>
+            <View style={{ flex: 1, paddingRight: 10 }}>
               <Text style={[styles.title, { color: colors.text }]}>
                 {t('photoCompare.title')}
               </Text>

@@ -527,6 +527,9 @@ export interface Translations {
     agreeBtn: string;
   };
   weeklyCheckIn: {
+    fastingWeightTitle: string;
+    fastingWeightHint: string;
+    fastingWeightPlaceholder: string;
     dietAdherenceTitle: string;
     dietAdherenceHint: string;
     energyLevelTitle: string;
@@ -546,6 +549,12 @@ export interface Translations {
     weeklyNotesTitle: string;
     weeklyNotesPlaceholder: string;
     submitCheckInBtn: string;
+    permissionError: string;
+    photoPickError: string;
+    invalidWeightError: string;
+    submitSuccessTitle: string;
+    submitSuccessMsg: string;
+    submitError: string;
   };
   cardio: {
     isCardio: string;
@@ -1128,6 +1137,9 @@ export const translations: Record<Language, Translations> = {
       agreeBtn: 'Compreendi e Concordo',
     },
     weeklyCheckIn: {
+      fastingWeightTitle: 'Peso em Jejum (kg)',
+      fastingWeightHint: 'Pesa-te logo pela manhã ao acordar e em jejum.',
+      fastingWeightPlaceholder: 'Ex: 78.5',
       dietAdherenceTitle: 'Adesão ao Plano Nutricional: {val}/10',
       dietAdherenceHint: '1 = Não cumpri nada • 10 = Cumpri as calorias e proteína a 100%',
       energyLevelTitle: 'Nível Médio de Energia: {val}/10',
@@ -1147,6 +1159,12 @@ export const translations: Record<Language, Translations> = {
       weeklyNotesTitle: 'Notas da Semana',
       weeklyNotesPlaceholder: 'Comentários sobre como correu a semana, apetite, dificuldades...',
       submitCheckInBtn: 'Submeter Check-in Semanal',
+      permissionError: 'Precisamos de permissão para aceder às tuas fotos.',
+      photoPickError: 'Não foi possível carregar a fotografia selecionada.',
+      invalidWeightError: 'Por favor, insere um peso válido em kg (ex: 78.5).',
+      submitSuccessTitle: 'Check-in Enviado!',
+      submitSuccessMsg: 'O teu check-in semanal foi registado e enviado para o teu treinador.',
+      submitError: 'Ocorreu um erro ao submeter o check-in. Tenta novamente.',
     },
     cardio: {
       isCardio: 'Cardio',
@@ -1728,6 +1746,9 @@ export const translations: Record<Language, Translations> = {
       agreeBtn: 'I Understand and Agree',
     },
     weeklyCheckIn: {
+      fastingWeightTitle: 'Fasting Weight (kg)',
+      fastingWeightHint: 'Weigh yourself first thing in the morning on an empty stomach.',
+      fastingWeightPlaceholder: 'E.g.: 78.5',
       dietAdherenceTitle: 'Diet Adherence: {val}/10',
       dietAdherenceHint: '1 = Did not follow • 10 = Followed calories and protein 100%',
       energyLevelTitle: 'Average Energy Level: {val}/10',
@@ -1747,6 +1768,12 @@ export const translations: Record<Language, Translations> = {
       weeklyNotesTitle: 'Weekly Notes',
       weeklyNotesPlaceholder: 'Comments on how the week went, energy, appetite, challenges...',
       submitCheckInBtn: 'Submit Weekly Check-in',
+      permissionError: 'We need permission to access your photos.',
+      photoPickError: 'Could not load the selected photo.',
+      invalidWeightError: 'Please enter a valid weight in kg (e.g. 78.5).',
+      submitSuccessTitle: 'Check-in Submitted!',
+      submitSuccessMsg: 'Your weekly check-in has been recorded and sent to your coach.',
+      submitError: 'An error occurred while submitting the check-in. Please try again.',
     },
     cardio: {
       isCardio: 'Cardio',
@@ -2328,6 +2355,9 @@ export const translations: Record<Language, Translations> = {
       agreeBtn: 'He Entendido y Acepto',
     },
     weeklyCheckIn: {
+      fastingWeightTitle: 'Peso en Ayunas (kg)',
+      fastingWeightHint: 'Pésate por la mañana al despertar y en ayunas.',
+      fastingWeightPlaceholder: 'Ej: 78.5',
       dietAdherenceTitle: 'Adhesión al Plan Nutricional: {val}/10',
       dietAdherenceHint: '1 = No cumplí nada • 10 = Cumplí calorías y proteína al 100%',
       energyLevelTitle: 'Nivel Medio de Energía: {val}/10',
@@ -2347,6 +2377,12 @@ export const translations: Record<Language, Translations> = {
       weeklyNotesTitle: 'Notas de la Semana',
       weeklyNotesPlaceholder: 'Comentarios sobre la semana, apetito, energía, sensaciones...',
       submitCheckInBtn: 'Enviar Check-in Semanal',
+      permissionError: 'Necesitamos permiso para acceder a tus fotos.',
+      photoPickError: 'No se pudo cargar la foto seleccionada.',
+      invalidWeightError: 'Por favor, introduce un peso válido en kg (ej: 78.5).',
+      submitSuccessTitle: '¡Check-in Enviado!',
+      submitSuccessMsg: 'Tu check-in semanal ha sido registrado y enviado a tu entrenador.',
+      submitError: 'Ocurrió un error al enviar el check-in. Inténtalo de nuevo.',
     },
     cardio: {
       isCardio: 'Cardio',
@@ -2928,6 +2964,9 @@ export const translations: Record<Language, Translations> = {
       agreeBtn: 'J\'ai Compris et J\'Accepte',
     },
     weeklyCheckIn: {
+      fastingWeightTitle: 'Poids à Jeun (kg)',
+      fastingWeightHint: 'Pesez-vous le matin au réveil et à jeun.',
+      fastingWeightPlaceholder: 'Ex : 78.5',
       dietAdherenceTitle: 'Adhésion au Plan Nutritionnel : {val}/10',
       dietAdherenceHint: '1 = Pas suivi • 10 = Calories et protéines respectées à 100%',
       energyLevelTitle: 'Niveau Moyen d\'Énergie : {val}/10',
@@ -2947,6 +2986,12 @@ export const translations: Record<Language, Translations> = {
       weeklyNotesTitle: 'Notes de la Semaine',
       weeklyNotesPlaceholder: 'Comment s\'est passée la semaine, énergie, appétit, ressentis...',
       submitCheckInBtn: 'Envoyer le Bilan Hebdomadaire',
+      permissionError: 'Nous avons besoin de la permission d\'accéder à vos photos.',
+      photoPickError: 'Impossible de charger la photo sélectionnée.',
+      invalidWeightError: 'Veuillez saisir un poids valide en kg (ex : 78.5).',
+      submitSuccessTitle: 'Bilan Envoyé !',
+      submitSuccessMsg: 'Votre bilan hebdomadaire a été enregistré et envoyé à votre coach.',
+      submitError: 'Une erreur s\'est produite lors de l\'envoi du bilan. Veuillez réessayer.',
     },
     cardio: {
       isCardio: 'Cardio',

@@ -178,14 +178,19 @@ export const WeeklyCheckInModal: React.FC<WeeklyCheckInModalProps> = ({
         <View style={[styles.modalContent, { backgroundColor: colors.bg }]}>
           {/* Cabeçalho do Modal */}
           <View style={[styles.header, { borderBottomColor: colors.border }]}>
-            <View>
+            <View style={styles.headerTitleWrap}>
               <Text style={[styles.headerTitle, { color: colors.text }]}>📋 {t('checkin.title')}</Text>
-              <Text style={[styles.headerSubtitle, { color: colors.muted }]}>
+              <Text style={[styles.headerSubtitle, { color: colors.muted }]} numberOfLines={2}>
                 {t('checkin.bannerSubtitle')}
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color={colors.text} />
+            <TouchableOpacity
+              onPress={onClose}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              style={[styles.closeButton, { backgroundColor: colors.surface2 }]}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={20} color={colors.text} />
             </TouchableOpacity>
           </View>
 
@@ -425,6 +430,10 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
   },
+  headerTitleWrap: {
+    flex: 1,
+    paddingRight: 14,
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: '800',
@@ -432,9 +441,15 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 13,
     marginTop: 2,
+    lineHeight: 18,
   },
   closeButton: {
-    padding: 6,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
   body: {
     flex: 1,

@@ -11,6 +11,7 @@ import {
   Platform,
   Modal,
   Alert,
+  Image,
 } from 'react-native';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
@@ -237,9 +238,11 @@ export default function LoginScreen() {
         >
           {/* Logótipo e Cabeçalho */}
           <View style={styles.mark}>
-            <View style={[styles.logo, { backgroundColor: colors.accent }]}>
-              <Text style={[styles.logoText, { color: mode === 'dark' ? '#0B0D10' : '#FFFFFF' }]}>PT</Text>
-            </View>
+            <Image
+              source={require('../assets/icon.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
             <Text style={[styles.title, { color: colors.text }]}>{t('auth.appTitle')}</Text>
             <Text style={[styles.subtitle, { color: colors.muted }]}>
               {t('auth.appSubtitle')}
@@ -632,6 +635,12 @@ const styles = StyleSheet.create({
   mark: {
     marginBottom: 24,
     alignItems: 'center',
+  },
+  logoImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    marginBottom: 16,
   },
   logo: {
     width: 64,

@@ -1,7 +1,7 @@
 import { useAuthStore } from '../store/useAuthStore';
 
 // URL base única para todo o frontend. Lê do ficheiro .env através de EXPO_PUBLIC_API_URL.
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.80:3000';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://fit-coach-hub.onrender.com';
 
 interface RequestOptions extends RequestInit {
   data?: any;

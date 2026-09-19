@@ -2,7 +2,7 @@
   "expo": {
     "name": "Fit Coach Hub",
     "slug": "fit-coach-hub",
-    "scheme": "fitcoachhub",
+    "scheme": ["fitcoachhub", "com.diogocoimbra.fitcoachhub"],
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

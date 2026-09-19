@@ -59,7 +59,6 @@ export default function LoginScreen() {
     iosClientId: '715283938816-qv35s088tbu2npb5am41i76qmtkl986r.apps.googleusercontent.com',
     androidClientId: '715283938816-4hio2kbp5u27nifolr33ot4d1fr5s8m8.apps.googleusercontent.com',
     scopes: ['profile', 'email', 'openid'],
-    responseType: 'id_token',
   });
 
   useEffect(() => {

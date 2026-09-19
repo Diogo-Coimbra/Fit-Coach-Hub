@@ -385,6 +385,26 @@ export interface Translations {
     noMealsRecorded: string;
     weeksCount: string;
     perWeek: string;
+    weeklyCheckInsTitle: string;
+    weeklyCheckInsSub: string;
+    beforeAfterBtn: string;
+    dietLabel: string;
+    energyLabel: string;
+    painAlertLevel: string;
+    noPainDetails: string;
+    studentComments: string;
+    evolutionPhotos: string;
+    sentOn: string;
+    feedbackEmptyAlert: string;
+    feedbackSentSuccess: string;
+    feedbackSentError: string;
+    sendReminderAlertTitle: string;
+    sendReminderAlertMsg: string;
+    sendReminderBtn: string;
+    reminderSentSuccess: string;
+    reminderSentError: string;
+    pdfExportError: string;
+    defaultCoachNotes: string;
   };
   templates: {
     title: string;
@@ -552,6 +572,22 @@ export interface Translations {
     tapToPlay: string;
     voiceNote: string;
     playingAudio: string;
+  };
+  photoCompare: {
+    title: string;
+    subtitle: string;
+    loading: string;
+    emptyTitle: string;
+    emptyDesc: string;
+    sliderMode: string;
+    sideBySideMode: string;
+    beforeInitial: string;
+    afterRecent: string;
+    before: string;
+    after: string;
+    noAfterPhoto: string;
+    noPhoto: string;
+    dragTip: string;
   };
 }
 
@@ -941,6 +977,26 @@ export const translations: Record<Language, Translations> = {
       noMealsRecorded: 'Nenhuma refeição registada por este aluno.',
       weeksCount: 'sem',
       perWeek: 'dias',
+      weeklyCheckInsTitle: 'Check-ins Semanais do Aluno',
+      weeklyCheckInsSub: 'Formulários enviados pelo aluno com peso em jejum, fotos e feedback',
+      beforeAfterBtn: 'Antes & Depois 📸',
+      dietLabel: 'Dieta',
+      energyLabel: 'Energia',
+      painAlertLevel: 'Alerta de Dor / Desconforto (Nível {val}/10)',
+      noPainDetails: 'O aluno reportou desconforto nesta semana sem detalhes adicionais.',
+      studentComments: 'Comentários do Aluno:',
+      evolutionPhotos: 'Fotografias de Evolução:',
+      sentOn: 'Enviado em {date}',
+      feedbackEmptyAlert: 'Por favor, escreve algum feedback antes de enviar.',
+      feedbackSentSuccess: 'Feedback enviado com sucesso! O teu aluno foi notificado via push.',
+      feedbackSentError: 'Erro ao submeter feedback.',
+      sendReminderAlertTitle: 'Enviar Alerta de Lembrete',
+      sendReminderAlertMsg: 'Desejas enviar uma notificação push para {name} a incentivar o treino?',
+      sendReminderBtn: 'Enviar 🔔',
+      reminderSentSuccess: 'Notificação enviada com sucesso a {name}!',
+      reminderSentError: 'Erro ao enviar notificação.',
+      pdfExportError: 'Não foi possível gerar o relatório PDF.',
+      defaultCoachNotes: 'Excelente consistência e evolução postural demonstrada ao longo do período de acompanhamento.',
     },
     templates: {
       title: 'Modelos de Treino',
@@ -1108,6 +1164,22 @@ export const translations: Record<Language, Translations> = {
       tapToPlay: 'Clica para reproduzir',
       voiceNote: 'Nota de Áudio',
       playingAudio: 'A reproduzir nota de áudio...',
+    },
+    photoCompare: {
+      title: '📸 Comparador "Antes & Depois"',
+      subtitle: '{name} • Prova de Resultados',
+      loading: 'A carregar registos fotográficos...',
+      emptyTitle: 'Sem Fotografias de Evolução',
+      emptyDesc: 'O aluno ainda não submeteu fotografias nos check-ins semanais ou avaliações físicas.',
+      sliderMode: 'Barra Deslizante',
+      sideBySideMode: 'Lado a Lado',
+      beforeInitial: 'ANTES (Inicial):',
+      afterRecent: 'DEPOIS (Recente):',
+      before: 'Antes',
+      after: 'Depois',
+      noAfterPhoto: 'Sem foto \'Depois\'',
+      noPhoto: 'Sem foto',
+      dragTip: '👆 Arrasta o separador para a esquerda e direita',
     },
   },
 
@@ -1496,6 +1568,26 @@ export const translations: Record<Language, Translations> = {
       noMealsRecorded: 'No meals recorded by this student.',
       weeksCount: 'wks',
       perWeek: 'days',
+      weeklyCheckInsTitle: 'Student Weekly Check-ins',
+      weeklyCheckInsSub: 'Forms submitted by student with fasting weight, photos, and feedback',
+      beforeAfterBtn: 'Before & After 📸',
+      dietLabel: 'Diet',
+      energyLabel: 'Energy',
+      painAlertLevel: 'Pain / Discomfort Alert (Level {val}/10)',
+      noPainDetails: 'The student reported discomfort this week without additional details.',
+      studentComments: 'Student Comments:',
+      evolutionPhotos: 'Evolution Photographs:',
+      sentOn: 'Sent on {date}',
+      feedbackEmptyAlert: 'Please write some feedback before sending.',
+      feedbackSentSuccess: 'Feedback sent successfully! Your student has been notified via push.',
+      feedbackSentError: 'Error submitting feedback.',
+      sendReminderAlertTitle: 'Send Reminder Alert',
+      sendReminderAlertMsg: 'Do you want to send a push notification to {name} to encourage training?',
+      sendReminderBtn: 'Send 🔔',
+      reminderSentSuccess: 'Notification successfully sent to {name}!',
+      reminderSentError: 'Error sending notification.',
+      pdfExportError: 'Could not generate PDF report.',
+      defaultCoachNotes: 'Excellent consistency and postural evolution demonstrated throughout the coaching period.',
     },
     templates: {
       title: 'Workout Templates',
@@ -1663,6 +1755,22 @@ export const translations: Record<Language, Translations> = {
       tapToPlay: 'Tap to play',
       voiceNote: 'Voice Note',
       playingAudio: 'Playing audio note...',
+    },
+    photoCompare: {
+      title: '📸 "Before & After" Comparison',
+      subtitle: '{name} • Proof of Results',
+      loading: 'Loading photo records...',
+      emptyTitle: 'No Evolution Photos',
+      emptyDesc: 'The student has not yet submitted photos in weekly check-ins or physical assessments.',
+      sliderMode: 'Slider',
+      sideBySideMode: 'Side by Side',
+      beforeInitial: 'BEFORE (Initial):',
+      afterRecent: 'AFTER (Recent):',
+      before: 'Before',
+      after: 'After',
+      noAfterPhoto: 'No \'After\' photo',
+      noPhoto: 'No photo',
+      dragTip: '👆 Drag the slider left and right',
     },
   },
 
@@ -2051,6 +2159,26 @@ export const translations: Record<Language, Translations> = {
       noMealsRecorded: 'Ninguna comida registrada por este alumno.',
       weeksCount: 'sem',
       perWeek: 'días',
+      weeklyCheckInsTitle: 'Check-ins Semanales del Alumno',
+      weeklyCheckInsSub: 'Formularios enviados por el alumno con peso en ayunas, fotos y comentarios',
+      beforeAfterBtn: 'Antes y Después 📸',
+      dietLabel: 'Dieta',
+      energyLabel: 'Energía',
+      painAlertLevel: 'Alerta de Dolor / Molestia (Nivel {val}/10)',
+      noPainDetails: 'El alumno reportó molestias esta semana sin detalles adicionales.',
+      studentComments: 'Comentarios del Alumno:',
+      evolutionPhotos: 'Fotografías de Evolución:',
+      sentOn: 'Enviado el {date}',
+      feedbackEmptyAlert: 'Por favor, escribe algún feedback antes de enviar.',
+      feedbackSentSuccess: '¡Feedback enviado con éxito! Tu alumno ha sido notificado por push.',
+      feedbackSentError: 'Error al enviar el feedback.',
+      sendReminderAlertTitle: 'Enviar Alerta de Recordatorio',
+      sendReminderAlertMsg: '¿Deseas enviar una notificación push a {name} para motivar el entrenamiento?',
+      sendReminderBtn: 'Enviar 🔔',
+      reminderSentSuccess: '¡Notificación enviada con éxito a {name}!',
+      reminderSentError: 'Error al enviar la notificación.',
+      pdfExportError: 'No se pudo generar el informe PDF.',
+      defaultCoachNotes: 'Excelente consistencia y evolución postural demostrada a lo largo del período de seguimiento.',
     },
     templates: {
       title: 'Plantillas de Rutina',
@@ -2218,6 +2346,22 @@ export const translations: Record<Language, Translations> = {
       tapToPlay: 'Toca para reproducir',
       voiceNote: 'Nota de Voz',
       playingAudio: 'Reproduciendo nota de audio...',
+    },
+    photoCompare: {
+      title: '📸 Comparador "Antes y Después"',
+      subtitle: '{name} • Prueba de Resultados',
+      loading: 'Cargando registros fotográficos...',
+      emptyTitle: 'Sin Fotografías de Evolución',
+      emptyDesc: 'El alumno aún no ha enviado fotos en los check-ins semanales ni valoraciones físicas.',
+      sliderMode: 'Barra Deslizante',
+      sideBySideMode: 'Lado a Lado',
+      beforeInitial: 'ANTES (Inicial):',
+      afterRecent: 'DESPUÉS (Reciente):',
+      before: 'Antes',
+      after: 'Después',
+      noAfterPhoto: 'Sin foto \'Después\'',
+      noPhoto: 'Sin foto',
+      dragTip: '👆 Arrastra el separador hacia la izquierda y derecha',
     },
   },
 
@@ -2606,6 +2750,26 @@ export const translations: Record<Language, Translations> = {
       noMealsRecorded: 'Aucun repas enregistré par cet élève.',
       weeksCount: 'sem',
       perWeek: 'jours',
+      weeklyCheckInsTitle: 'Bilans Hebdomadaires de l\'Élève',
+      weeklyCheckInsSub: 'Formulaires soumis par l\'élève avec poids à jeun, photos et ressentis',
+      beforeAfterBtn: 'Avant / Après 📸',
+      dietLabel: 'Diète',
+      energyLabel: 'Énergie',
+      painAlertLevel: 'Alerte Douleur / Gêne (Niveau {val}/10)',
+      noPainDetails: 'L\'élève a signalé une gêne cette semaine sans détails supplémentaires.',
+      studentComments: 'Commentaires de l\'Élève :',
+      evolutionPhotos: 'Photographies d\'Évolution :',
+      sentOn: 'Envoyé le {date}',
+      feedbackEmptyAlert: 'Veuillez rédiger un retour avant d’envoyer.',
+      feedbackSentSuccess: 'Retour envoyé avec succès ! Votre élève a été notifié par push.',
+      feedbackSentError: 'Erreur lors de l’envoi du retour.',
+      sendReminderAlertTitle: 'Envoyer un Rappel',
+      sendReminderAlertMsg: 'Souhaitez-vous envoyer une notification push à {name} pour encourager l’entraînement ?',
+      sendReminderBtn: 'Envoyer 🔔',
+      reminderSentSuccess: 'Notification envoyée avec succès à {name} !',
+      reminderSentError: 'Erreur lors de l’envoi de la notification.',
+      pdfExportError: 'Impossible de générer le rapport PDF.',
+      defaultCoachNotes: 'Excellente régularité et évolution posturale démontrées tout au long de la période de suivi.',
     },
     templates: {
       title: 'Modèles de Séance',
@@ -2773,6 +2937,22 @@ export const translations: Record<Language, Translations> = {
       tapToPlay: 'Appuyez pour lire',
       voiceNote: 'Note Vocale',
       playingAudio: 'Lecture de la note vocale...',
+    },
+    photoCompare: {
+      title: '📸 Comparateur "Avant / Après"',
+      subtitle: '{name} • Preuve de Résultats',
+      loading: 'Chargement des photos...',
+      emptyTitle: 'Aucune Photo d\'Évolution',
+      emptyDesc: 'L\'élève n\'a pas encore soumis de photos dans ses bilans hebdomadaires ou évaluations physiques.',
+      sliderMode: 'Curseur Glissant',
+      sideBySideMode: 'Côte à Côte',
+      beforeInitial: 'AVANT (Initial) :',
+      afterRecent: 'APRÈS (Récent) :',
+      before: 'Avant',
+      after: 'Après',
+      noAfterPhoto: 'Pas de photo \'Après\'',
+      noPhoto: 'Pas de photo',
+      dragTip: '👆 Faites glisser le curseur vers la gauche et la droite',
     },
   },
 };

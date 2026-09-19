@@ -108,7 +108,7 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
   const handleSendFeedback = async (checkInId: string) => {
     const feedback = feedbackDrafts[checkInId]?.trim();
     if (!feedback) {
-      Alert.alert(t('common.attention'), 'Por favor, escreve algum feedback antes de enviar.');
+      Alert.alert(t('common.attention'), t('clientDetails.feedbackEmptyAlert'));
       return;
     }
 
@@ -122,9 +122,9 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
             : c
         )
       );
-      Alert.alert(t('common.success'), 'Feedback enviado com sucesso! O teu aluno foi notificado via push.');
+      Alert.alert(t('common.success'), t('clientDetails.feedbackSentSuccess'));
     } catch (err: any) {
-      Alert.alert(t('common.error'), err.message || 'Erro ao submeter feedback.');
+      Alert.alert(t('common.error'), err.message || t('clientDetails.feedbackSentError'));
     } finally {
       setIsSendingFeedback((prev) => ({ ...prev, [checkInId]: false }));
     }
@@ -132,18 +132,18 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
 
   const handleSendPushReminder = async () => {
     Alert.alert(
-      'Enviar Alerta de Lembrete',
-      `Desejas enviar uma notificação push para ${client?.name || 'o aluno'} a incentivar o treino?`,
+      t('clientDetails.sendReminderAlertTitle'),
+      t('clientDetails.sendReminderAlertMsg', { name: client?.name || t('clientDetails.studentFile') }),
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Enviar 🔔',
+          text: t('clientDetails.sendReminderBtn'),
           onPress: async () => {
             try {
               await api.post('/api/coach/notify-inactive', { clientId });
-              Alert.alert(t('common.success'), `Notificação enviada com sucesso a ${client?.name}!`);
+              Alert.alert(t('common.success'), t('clientDetails.reminderSentSuccess', { name: client?.name || '' }));
             } catch (err: any) {
-              Alert.alert(t('common.error'), err.message || 'Erro ao enviar notificação.');
+              Alert.alert(t('common.error'), err.message || t('clientDetails.reminderSentError'));
             }
           },
         },
@@ -216,11 +216,11 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
         afterDate,
         coachNotes:
           client?.coachNotes ||
-          'Excelente consistência e evolução postural demonstrada ao longo do período de acompanhamento.',
+          t('clientDetails.defaultCoachNotes'),
       });
     } catch (err: any) {
       console.error('Erro ao gerar relatório PDF:', err);
-      Alert.alert(t('common.error'), 'Não foi possível gerar o relatório PDF.');
+      Alert.alert(t('common.error'), t('clientDetails.pdfExportError'));
     } finally {
       setIsExportingPDF(false);
     }
@@ -884,9 +884,9 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
           <View style={{ flex: 1 }}>
             <View style={styles.actionHeader}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.tabSectionTitle}>Check-ins Semanais do Aluno</Text>
+                <Text style={styles.tabSectionTitle}>{t('clientDetails.weeklyCheckInsTitle')}</Text>
                 <Text style={{ color: colors.muted, fontSize: 12 }}>
-                  Formulários enviados pelo aluno com peso em jejum, fotos e feedback
+                  {t('clientDetails.weeklyCheckInsSub')}
                 </Text>
               </View>
               <TouchableOpacity
@@ -902,7 +902,7 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
                 onPress={() => setIsPhotoCompareVisible(true)}
               >
                 <Ionicons name="images-outline" size={16} color={colors.bg} />
-                <Text style={{ color: colors.bg, fontSize: 13, fontWeight: '700' }}>Antes & Depois 📸</Text>
+                <Text style={{ color: colors.bg, fontSize: 13, fontWeight: '700' }}>{t('clientDetails.beforeAfterBtn')}</Text>
               </TouchableOpacity>
             </View>
 
@@ -937,12 +937,12 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
                       <View style={{ flexDirection: 'row', gap: 6 }}>
                         <View style={[styles.miniMetricBadge, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
                           <Text style={[styles.miniMetricText, { color: '#10B981' }]}>
-                            Dieta: {item.dietAdherence}/10
+                            {t('clientDetails.dietLabel')}: {item.dietAdherence}/10
                           </Text>
                         </View>
                         <View style={[styles.miniMetricBadge, { backgroundColor: 'rgba(245, 158, 11, 0.15)' }]}>
                           <Text style={[styles.miniMetricText, { color: '#F59E0B' }]}>
-                            Energia: {item.energyLevel}/10
+                            {t('clientDetails.energyLabel')}: {item.energyLevel}/10
                           </Text>
                         </View>
                       </View>
@@ -954,11 +954,11 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <Ionicons name="warning" size={18} color="#EF4444" />
                           <Text style={styles.painAlertTitle}>
-                            Alerta de Dor / Desconforto (Nível {item.painLevel}/10)
+                            {t('clientDetails.painAlertLevel', { val: item.painLevel })}
                           </Text>
                         </View>
                         <Text style={styles.painAlertDesc}>
-                          {item.painNotes || 'O aluno reportou desconforto nesta semana sem detalhes adicionais.'}
+                          {item.painNotes || t('clientDetails.noPainDetails')}
                         </Text>
                       </View>
                     ) : null}
@@ -966,7 +966,7 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
                     {/* Notas do Aluno */}
                     {item.notes ? (
                       <View style={styles.checkInNotesBox}>
-                        <Text style={styles.notesLabel}>Comentários do Aluno:</Text>
+                        <Text style={styles.notesLabel}>{t('clientDetails.studentComments')}</Text>
                         <Text style={styles.notesText}>{item.notes}</Text>
                       </View>
                     ) : null}
@@ -974,24 +974,24 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
                     {/* Fotos de Evolução (Frente, Costas, Lateral) */}
                     {hasPhotos ? (
                       <View style={styles.checkInPhotosSection}>
-                        <Text style={styles.notesLabel}>Fotografias de Evolução:</Text>
+                        <Text style={styles.notesLabel}>{t('clientDetails.evolutionPhotos')}</Text>
                         <View style={styles.checkInPhotosRow}>
                           {item.frontPhotoUrl ? (
                             <View style={styles.checkInPhotoWrap}>
                               <Image source={{ uri: item.frontPhotoUrl }} style={styles.checkInPhoto} />
-                              <Text style={styles.photoTag}>Frente</Text>
+                              <Text style={styles.photoTag}>{t('weeklyCheckIn.front')}</Text>
                             </View>
                           ) : null}
                           {item.backPhotoUrl ? (
                             <View style={styles.checkInPhotoWrap}>
                               <Image source={{ uri: item.backPhotoUrl }} style={styles.checkInPhoto} />
-                              <Text style={styles.photoTag}>Costas</Text>
+                              <Text style={styles.photoTag}>{t('weeklyCheckIn.back')}</Text>
                             </View>
                           ) : null}
                           {item.sidePhotoUrl ? (
                             <View style={styles.checkInPhotoWrap}>
                               <Image source={{ uri: item.sidePhotoUrl }} style={styles.checkInPhoto} />
-                              <Text style={styles.photoTag}>Lateral</Text>
+                              <Text style={styles.photoTag}>{t('weeklyCheckIn.side')}</Text>
                             </View>
                           ) : null}
                         </View>
@@ -1004,7 +1004,7 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
                         <Text style={styles.feedbackSectionTitle}>{t('checkin.feedbackTitle')}</Text>
                         {item.reviewedAt ? (
                           <Text style={{ color: colors.muted, fontSize: 11 }}>
-                            Enviado em {new Date(item.reviewedAt).toLocaleDateString(currentLocale)}
+                            {t('clientDetails.sentOn', { date: new Date(item.reviewedAt).toLocaleDateString(currentLocale) })}
                           </Text>
                         ) : null}
                       </View>

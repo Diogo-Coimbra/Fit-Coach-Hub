@@ -169,10 +169,10 @@ export default function PhotoCompareModal({
           <View style={styles.header}>
             <View>
               <Text style={[styles.title, { color: colors.text }]}>
-                📸 Comparador "Antes & Depois"
+                {t('photoCompare.title')}
               </Text>
               <Text style={[styles.subtitle, { color: colors.muted }]}>
-                {clientName} • Prova de Resultados
+                {t('photoCompare.subtitle', { name: clientName })}
               </Text>
             </View>
             <TouchableOpacity onPress={onClose} hitSlop={10} style={styles.closeBtn}>
@@ -183,14 +183,14 @@ export default function PhotoCompareModal({
           {isLoading ? (
             <View style={styles.loadingBox}>
               <ActivityIndicator size="large" color={colors.accent} />
-              <Text style={[styles.loadingText, { color: colors.muted }]}>A carregar registos fotográficos...</Text>
+              <Text style={[styles.loadingText, { color: colors.muted }]}>{t('photoCompare.loading')}</Text>
             </View>
           ) : photoList.length === 0 ? (
             <View style={styles.emptyBox}>
               <Ionicons name="images-outline" size={56} color={colors.muted} />
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>Sem Fotografias de Evolução</Text>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('photoCompare.emptyTitle')}</Text>
               <Text style={[styles.emptyDesc, { color: colors.muted }]}>
-                O aluno ainda não submeteu fotografias nos check-ins semanais ou avaliações físicas.
+                {t('photoCompare.emptyDesc')}
               </Text>
             </View>
           ) : (
@@ -199,7 +199,12 @@ export default function PhotoCompareModal({
               <View style={[styles.angleTabs, { backgroundColor: colors.bg, borderColor: colors.border }]}>
                 {(['front', 'back', 'side'] as const).map((angle) => {
                   const isSel = selectedAngle === angle;
-                  const label = angle === 'front' ? 'Frente' : angle === 'back' ? 'Costas' : 'Perfil';
+                  const label =
+                    angle === 'front'
+                      ? t('weeklyCheckIn.front')
+                      : angle === 'back'
+                      ? t('weeklyCheckIn.back')
+                      : t('weeklyCheckIn.side');
                   return (
                     <TouchableOpacity
                       key={angle}
@@ -222,7 +227,7 @@ export default function PhotoCompareModal({
                 >
                   <Ionicons name="swap-horizontal" size={16} color={mode === 'slider' ? colors.accent : colors.muted} />
                   <Text style={[styles.modeBtnText, { color: mode === 'slider' ? colors.accent : colors.muted }]}>
-                    Barra Deslizante
+                    {t('photoCompare.sliderMode')}
                   </Text>
                 </TouchableOpacity>
 
@@ -232,7 +237,7 @@ export default function PhotoCompareModal({
                 >
                   <Ionicons name="grid-outline" size={16} color={mode === 'sideBySide' ? colors.accent : colors.muted} />
                   <Text style={[styles.modeBtnText, { color: mode === 'sideBySide' ? colors.accent : colors.muted }]}>
-                    Lado a Lado
+                    {t('photoCompare.sideBySideMode')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -240,7 +245,7 @@ export default function PhotoCompareModal({
               {/* Seletor de Datas (Antes vs Depois) */}
               <View style={styles.datesRow}>
                 <View style={[styles.dateBox, { backgroundColor: colors.bg, borderColor: colors.border }]}>
-                  <Text style={[styles.dateLabel, { color: colors.muted }]}>ANTES (Inicial):</Text>
+                  <Text style={[styles.dateLabel, { color: colors.muted }]}>{t('photoCompare.beforeInitial')}</Text>
                   <Text style={[styles.dateValue, { color: colors.text }]}>{formatDate(beforeItem?.date)}</Text>
                   {beforeItem?.weight ? (
                     <Text style={[styles.weightBadge, { color: colors.muted }]}>{beforeItem.weight} kg</Text>
@@ -262,7 +267,7 @@ export default function PhotoCompareModal({
                 </View>
 
                 <View style={[styles.dateBox, { backgroundColor: colors.bg, borderColor: colors.border }]}>
-                  <Text style={[styles.dateLabel, { color: colors.accent }]}>DEPOIS (Recente):</Text>
+                  <Text style={[styles.dateLabel, { color: colors.accent }]}>{t('photoCompare.afterRecent')}</Text>
                   <Text style={[styles.dateValue, { color: colors.text }]}>{formatDate(afterItem?.date)}</Text>
                   {afterItem?.weight ? (
                     <Text style={[styles.weightBadge, { color: colors.accent }]}>{afterItem.weight} kg</Text>
@@ -279,7 +284,7 @@ export default function PhotoCompareModal({
                       <Image source={{ uri: afterUrl }} style={styles.imageLayer} resizeMode="cover" />
                     ) : (
                       <View style={[styles.imageFallback, { backgroundColor: colors.bg }]}>
-                        <Text style={{ color: colors.muted }}>Sem foto 'Depois'</Text>
+                        <Text style={{ color: colors.muted }}>{t('photoCompare.noAfterPhoto')}</Text>
                       </View>
                     )}
 
@@ -303,17 +308,17 @@ export default function PhotoCompareModal({
 
                     {/* Badges de Legenda Flutuantes */}
                     <View style={[styles.floatingBadge, styles.badgeLeft]}>
-                      <Text style={styles.floatingBadgeText}>Antes</Text>
+                      <Text style={styles.floatingBadgeText}>{t('photoCompare.before')}</Text>
                     </View>
                     <View style={[styles.floatingBadge, styles.badgeRight]}>
-                      <Text style={styles.floatingBadgeText}>Depois</Text>
+                      <Text style={styles.floatingBadgeText}>{t('photoCompare.after')}</Text>
                     </View>
                   </View>
 
                   {/* Controle de arrasto com PanResponder */}
                   <View {...panResponder.panHandlers} style={[styles.touchTrack, { width: CONTAINER_WIDTH }]}>
                     <Text style={[styles.dragTip, { color: colors.muted }]}>
-                      👆 Arrasta o separador para a esquerda e direita
+                      {t('photoCompare.dragTip')}
                     </Text>
                   </View>
                 </View>
@@ -322,14 +327,14 @@ export default function PhotoCompareModal({
                 <View style={styles.sideBySideRow}>
                   <View style={[styles.sideCard, { borderColor: colors.border }]}>
                     <View style={styles.sideHeader}>
-                      <Text style={[styles.sideTitle, { color: colors.muted }]}>ANTES</Text>
+                      <Text style={[styles.sideTitle, { color: colors.muted }]}>{t('photoCompare.before')}</Text>
                       <Text style={[styles.sideSub, { color: colors.muted }]}>{formatDate(beforeItem?.date)}</Text>
                     </View>
                     {beforeUrl ? (
                       <Image source={{ uri: beforeUrl }} style={styles.sideImage} resizeMode="cover" />
                     ) : (
                       <View style={styles.sideFallback}>
-                        <Text style={{ color: colors.muted }}>Sem foto</Text>
+                        <Text style={{ color: colors.muted }}>{t('photoCompare.noPhoto')}</Text>
                       </View>
                     )}
                     <Text style={[styles.sideWeight, { color: colors.text }]}>{beforeItem?.weight || '--'} kg</Text>
@@ -337,14 +342,14 @@ export default function PhotoCompareModal({
 
                   <View style={[styles.sideCard, { borderColor: colors.accent }]}>
                     <View style={styles.sideHeader}>
-                      <Text style={[styles.sideTitle, { color: colors.accent }]}>DEPOIS</Text>
+                      <Text style={[styles.sideTitle, { color: colors.accent }]}>{t('photoCompare.after')}</Text>
                       <Text style={[styles.sideSub, { color: colors.accent }]}>{formatDate(afterItem?.date)}</Text>
                     </View>
                     {afterUrl ? (
                       <Image source={{ uri: afterUrl }} style={styles.sideImage} resizeMode="cover" />
                     ) : (
                       <View style={styles.sideFallback}>
-                        <Text style={{ color: colors.muted }}>Sem foto</Text>
+                        <Text style={{ color: colors.muted }}>{t('photoCompare.noPhoto')}</Text>
                       </View>
                     )}
                     <Text style={[styles.sideWeight, { color: colors.accent }]}>{afterItem?.weight || '--'} kg</Text>

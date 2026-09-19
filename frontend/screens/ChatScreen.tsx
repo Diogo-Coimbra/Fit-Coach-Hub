@@ -27,7 +27,8 @@ import {
   AudioPlayer,
 } from 'expo-audio';
 import { useFocusEffect } from '@react-navigation/native';
-import { BackButton, Card, Screen, showAlert } from '../components/ui';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BackButton, Card, showAlert } from '../components/ui';
 import { useAuthStore } from '../store/useAuthStore';
 import { useTheme } from '../store/useThemeStore';
 import { useLanguage } from '../store/useLanguageStore';
@@ -77,6 +78,8 @@ export default function ChatScreen({ route, navigation }: any) {
   // Estados para Gestão de Mensagens (Copiar, Editar, Apagar)
   const [selectedMsgForMenu, setSelectedMsgForMenu] = useState<ChatMessageItem | null>(null);
   const [editingMessage, setEditingMessage] = useState<ChatMessageItem | null>(null);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const flatListRef = useRef<FlatList>(null);
   const mediaRecorderRef = useRef<any>(null);
@@ -87,18 +90,26 @@ export default function ChatScreen({ route, navigation }: any) {
 
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
-  // Auto-scroll ao abrir o teclado virtual
+  // Auto-scroll ao abrir o teclado virtual e rastreio de visibilidade
   useEffect(() => {
     const showSub = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       () => {
+        setIsKeyboardVisible(true);
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
         }, 100);
       }
     );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setIsKeyboardVisible(false);
+      }
+    );
     return () => {
       showSub.remove();
+      hideSub.remove();
     };
   }, []);
 
@@ -638,10 +649,11 @@ export default function ChatScreen({ route, navigation }: any) {
   };
 
   return (
-    <Screen>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         {/* Barra de Topo do Chat */}
         <View style={[styles.topBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
@@ -681,6 +693,7 @@ export default function ChatScreen({ route, navigation }: any) {
             keyExtractor={(item) => item.id}
             renderItem={renderMessage}
             contentContainerStyle={styles.messagesList}
+            keyboardShouldPersistTaps="handled"
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
             ListEmptyComponent={
               <View style={styles.emptyBox}>
@@ -715,7 +728,16 @@ export default function ChatScreen({ route, navigation }: any) {
 
         {/* Painel de Gravação de Áudio Ativa */}
         {isRecordingAudio ? (
-          <View style={[styles.recordingBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View
+            style={[
+              styles.recordingBar,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                paddingBottom: isKeyboardVisible ? space.sm : Math.max(insets.bottom, space.sm),
+              },
+            ]}
+          >
             <View style={styles.recordingPulse}>
               <View style={styles.redDot} />
               <Text style={[styles.recordingText, { color: colors.text }]}>
@@ -733,7 +755,16 @@ export default function ChatScreen({ route, navigation }: any) {
           </View>
         ) : (
           /* Barra de Entrada de Mensagem */
-          <View style={[styles.inputBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+          <View
+            style={[
+              styles.inputBar,
+              {
+                backgroundColor: colors.surface,
+                borderTopColor: colors.border,
+                paddingBottom: isKeyboardVisible ? space.sm : Math.max(insets.bottom, space.sm),
+              },
+            ]}
+          >
             {/* Anexar Foto */}
             <TouchableOpacity
               style={styles.iconBtn}
@@ -890,7 +921,7 @@ export default function ChatScreen({ route, navigation }: any) {
           ) : null}
         </View>
       </Modal>
-    </Screen>
+    </SafeAreaView>
   );
 }
 

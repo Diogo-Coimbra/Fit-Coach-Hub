@@ -478,7 +478,11 @@ app.post('/api/auth/google', async (req, res) => {
   try {
     const ticket = await googleClient.verifyIdToken({
       idToken: token,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: [
+        process.env.GOOGLE_CLIENT_ID,
+        '715283938816-4hio2kbp5u27nifolr33ot4d1fr5s8m8.apps.googleusercontent.com',
+        '715283938816-qv35s088tbu2npb5am41i76qmtkl986r.apps.googleusercontent.com',
+      ].filter(Boolean) as string[],
     });
 
     const payload = ticket.getPayload();
